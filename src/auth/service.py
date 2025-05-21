@@ -21,15 +21,15 @@ async def get_db():
 
 async def register_user(user: UserCreate, db: AsyncSession):
     hashed = pwd_context.hash(user.password)
-    db_user = User(username=user.username, password=hashed)
+    db_user = User(email=user.email, fullname=user.fullname, password=hashed)
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
     return db_user
 
-async def authenticate_user(username: str, password: str, db: AsyncSession):
+async def authenticate_user(email: str, password: str, db: AsyncSession):
     result = await db.execute(
-        select(User).where(User.username == username)
+        select(User).where(User.email == email)
     )
     user = result.scalars().first()
 
@@ -39,7 +39,7 @@ async def authenticate_user(username: str, password: str, db: AsyncSession):
 
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm, db: AsyncSession) -> Token:
     user = await authenticate_user(form_data.username, form_data.password, db)
-    access_token = create_access_token({"sub": user.username})
+    access_token = create_access_token({"sub": user.email})
     return Token(access_token=access_token)
 
 
