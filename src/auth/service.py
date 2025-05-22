@@ -1,14 +1,20 @@
-# src/auth/service.py
+# scr/auth/service.py
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from passlib.context import CryptContext
-from src.auth.models import User, BlacklistedToken
+from starlette.responses import JSONResponse
+
+from src.auth.models import User
 from src.auth.schemas import Token, UserCreate
-from src.database import AsyncSessionLocal, get_async_session
-from src.auth.utils import create_access_token, verify_password, decode_access_token
+from src.database import AsyncSessionLocal
+from src.auth.utils import (
+    create_access_token,
+    create_refresh_token,
+    decode_access_token,
+    verify_password
+)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -28,39 +34,64 @@ async def register_user(user: UserCreate, db: AsyncSession):
     return db_user
 
 async def authenticate_user(email: str, password: str, db: AsyncSession):
-    result = await db.execute(
-        select(User).where(User.email == email)
-    )
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalars().first()
 
-    if not user or not pwd_context.verify(password, user.password):
+    if not user or not verify_password(password, user.password):
         raise HTTPException(status_code=400, detail="Invalid credentials")
     return user
 
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm, db: AsyncSession) -> Token:
+def generate_tokens(sub: str) -> Token:
+    return Token(
+        access_token=create_access_token({"sub": sub}),
+        refresh_token=create_refresh_token({"sub": sub}),
+        token_type="bearer"
+    )
+
+async def login_user_and_set_cookie(
+    form_data: OAuth2PasswordRequestForm,
+    db: AsyncSession,
+    response: Response
+) -> dict:
     user = await authenticate_user(form_data.username, form_data.password, db)
-    access_token = create_access_token({"sub": user.email})
-    return Token(access_token=access_token)
+    token_data = generate_tokens(user.email)
 
+    response.set_cookie(
+        key="refresh_token",
+        value=token_data.refresh_token,
+        httponly=True,
+        secure=False,  # Set to True in production
+        samesite="strict",
+        path="/",  # Ensures cookie is sent to /auth/* endpoints
+        max_age=60 * 60 * 24 * 7  # 7 days
+    )
 
-async def blacklist_token(token: str, db: AsyncSession):
+    return {
+        "access_token": token_data.access_token,
+        "token_type": "bearer"
+    }
+
+async def refresh_access_token_service(refresh_token: str) -> dict:
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="No refresh token")
+
     try:
-        # Decode the token to extract the jti (unique token identifier)
-        payload = decode_access_token(token)
-        jti = payload.get("jti")
-        if not jti:
-            raise HTTPException(status_code=400, detail="Invalid token: missing jti")
-
-        existing = await db.execute(
-            select(BlacklistedToken).where(BlacklistedToken.jti == jti)
-        )
-        if existing.scalars().first():
-            return {"msg": "Token already blacklisted"}
-
-        # Add the token to the blacklist
-        blacklisted_token = BlacklistedToken(jti=jti)
-        db.add(blacklisted_token)
-        await db.commit()
-        return {"msg": "Token blacklisted successfully"}
+        payload = decode_access_token(refresh_token)
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    return {
+        "access_token": create_access_token({"sub": payload["sub"]}),
+        "token_type": "bearer"
+    }
+
+async def logout_user(db: AsyncSession) -> JSONResponse:
+    response = JSONResponse(content={"message": "Logged out successfully"})
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        secure=False,  # Set to True in production
+        samesite="strict",
+        path="/"  # Matches the path set in login
+    )
+    return response

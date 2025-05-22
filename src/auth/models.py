@@ -1,6 +1,5 @@
 # src/auth/models.py
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String
 from src.database import Base
 
 class User(Base):
@@ -9,9 +8,3 @@ class User(Base):
     fullname = Column(String, index=True)
     email = Column(String, unique=True, index=True)
     password = Column(String)
-
-class BlacklistedToken(Base):
-    __tablename__ = "blacklisted_tokens"
-    id = Column(Integer, primary_key=True, index=True)
-    jti = Column(String, unique=True, index=True)  # Store the jti instead of the full token
-    blacklisted_on = Column(DateTime, default=datetime.utcnow())

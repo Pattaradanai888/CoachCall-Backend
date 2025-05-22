@@ -6,7 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from sqlalchemy.ext.asyncio import AsyncEngine
 from alembic import context
 from src.database import Base
-from src.auth.models import User, BlacklistedToken
+from src.auth.models import User
 
 # Load .env file
 load_dotenv()

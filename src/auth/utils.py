@@ -1,5 +1,4 @@
 # src/auth/utils.py
-import uuid
 import jwt
 from datetime import datetime, timedelta
 
@@ -15,7 +14,12 @@ def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=auth_settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    to_encode.update({"jti": str(uuid.uuid4())})
+    return jwt.encode(to_encode, auth_settings.JWT_SECRET, algorithm=auth_settings.JWT_ALGORITHM)
+
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=auth_settings.REFRESH_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
     return jwt.encode(to_encode, auth_settings.JWT_SECRET, algorithm=auth_settings.JWT_ALGORITHM)
 
 def decode_access_token(token: str):
