@@ -20,6 +20,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 @app.get("/")
 async def read_root():
     return {"msg": "Welcome to FastAPIApp!"}
+
+
+@app.get("/health-check")
+async def health_check():
+    return {"status": "healthy"}

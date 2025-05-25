@@ -1,97 +1,61 @@
-# scr/auth/service.py
+# src/auth/service.py
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, HTTPException, Response, status
-from fastapi.security import OAuth2PasswordRequestForm
-from passlib.context import CryptContext
-from starlette.responses import JSONResponse
+from fastapi import HTTPException, status
 
 from src.auth.models import User
-from src.auth.schemas import Token, UserCreate
-from src.database import AsyncSessionLocal
+from src.auth.schemas import Token, UserCreate, UserRead
 from src.auth.utils import (
     create_access_token,
     create_refresh_token,
     decode_access_token,
-    verify_password
+    verify_password,
+    hash_password
 )
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-async def get_db():
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
 
 async def register_user(user: UserCreate, db: AsyncSession):
-    hashed = pwd_context.hash(user.password)
+    hashed = hash_password(user.password)
     db_user = User(email=user.email, fullname=user.fullname, password=hashed)
     db.add(db_user)
-    await db.commit()
-    await db.refresh(db_user)
+    try:
+        await db.commit()
+        await db.refresh(db_user)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
+        )
     return db_user
 
-async def authenticate_user(email: str, password: str, db: AsyncSession):
+
+async def login_user(email: str, password: str, db: AsyncSession) -> Token:
+    # Authenticate and generate tokens; no HTTP concerns here
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalars().first()
-
     if not user or not verify_password(password, user.password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
-    return user
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials")
 
-def generate_tokens(sub: str) -> Token:
-    return Token(
-        access_token=create_access_token({"sub": sub}),
-        refresh_token=create_refresh_token({"sub": sub}),
-        token_type="bearer"
-    )
+    access = create_access_token({"sub": user.email})
+    refresh = create_refresh_token({"sub": user.email})
+    return Token(access_token=access, refresh_token=refresh, token_type="bearer")
 
-async def login_user_and_set_cookie(
-    form_data: OAuth2PasswordRequestForm,
-    db: AsyncSession,
-    response: Response
-) -> dict:
-    user = await authenticate_user(form_data.username, form_data.password, db)
-    token_data = generate_tokens(user.email)
 
-    response.set_cookie(
-        key="refresh_token",
-        value=token_data.refresh_token,
-        httponly=True,
-        secure=False,  # Set to True in production
-        samesite="strict",
-        path="/",  # Ensures cookie is sent to /auth/* endpoints
-        max_age=60 * 60 * 24 * 7  # 7 days
-    )
-
-    return {
-        "access_token": token_data.access_token,
-        "token_type": "bearer"
-    }
-
-async def refresh_access_token_service(refresh_token: str) -> dict:
-    if not refresh_token:
-        raise HTTPException(status_code=401, detail="No refresh token")
-
+async def refresh_tokens(old_refresh: str) -> Token:
+    if not old_refresh:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token")
     try:
-        payload = decode_access_token(refresh_token)
+        payload = decode_access_token(old_refresh)
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
-    return {
-        "access_token": create_access_token({"sub": payload["sub"]}),
-        "token_type": "bearer"
-    }
+    # Rotate both tokens
+    access = create_access_token({"sub": payload["sub"]})
+    refresh = create_refresh_token({"sub": payload["sub"]})
+    return Token(access_token=access, refresh_token=refresh, token_type="bearer")
 
-async def logout_user(db: AsyncSession) -> JSONResponse:
-    response = JSONResponse(content={"message": "Logged out successfully"})
-    response.delete_cookie(
-        key="refresh_token",
-        httponly=True,
-        secure=False,  # Set to True in production
-        samesite="strict",
-        path="/"  # Matches the path set in login
-    )
-    return response
+
+async def logout_user() -> None:
+    return

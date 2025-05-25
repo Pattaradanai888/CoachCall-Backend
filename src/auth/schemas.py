@@ -9,14 +9,15 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
 
+
 class Token(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str = "bearer"
 
+
 class UserRead(BaseModel):
     id: int
-    email: EmailStr
+    email: str
     fullname: str
-
     model_config = ConfigDict(from_attributes=True)
