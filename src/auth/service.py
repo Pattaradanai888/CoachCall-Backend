@@ -22,13 +22,14 @@ async def register_user(user: UserCreate, db: AsyncSession):
     try:
         await db.commit()
         await db.refresh(db_user)
+        return db_user
     except IntegrityError:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
         )
-    return db_user
+
 
 
 async def login_user(email: str, password: str, db: AsyncSession) -> Token:

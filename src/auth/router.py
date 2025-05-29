@@ -1,5 +1,5 @@
 # src/auth/router.py
-from typing import Any, Coroutine
+from typing import Any, Coroutine, Optional
 
 from fastapi import APIRouter, Depends, Response, Request, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
@@ -9,7 +9,7 @@ from starlette.responses import JSONResponse
 from src.auth.models import User
 from src.auth.schemas import UserCreate, Token, UserRead
 from src.auth.service import register_user, login_user, refresh_tokens, logout_user as service_logout, logout_user
-from src.auth.dependencies import get_current_user
+from src.auth.dependencies import get_current_user, get_optional_current_user
 from src.database import get_async_session
 
 router = APIRouter()
@@ -73,3 +73,10 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_async_sessio
 @router.get("/me", response_model=UserRead)
 async def get_me(current_user=Depends(get_current_user)):
     return current_user
+
+@router.get("/verify")
+async def verify_token(current_user: Optional[User] = Depends(get_optional_current_user)):
+    return {
+        "valid": current_user is not None,
+        "user_id": current_user.id if current_user else None
+    }

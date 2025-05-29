@@ -1,4 +1,6 @@
 # src/auth/dependencies.py
+from typing import Optional
+
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
@@ -32,3 +34,16 @@ async def get_current_user(
     if user is None:
         raise HTTPException(status_code=401, detail="User not found")
     return user
+
+
+async def get_optional_current_user(
+        token: Optional[str] = Depends(oauth2_scheme),
+        db: AsyncSession = Depends(get_async_session)
+) -> Optional[User]:
+    if not token:
+        return None
+
+    try:
+        return await get_current_user(token, db)
+    except HTTPException:
+        return None

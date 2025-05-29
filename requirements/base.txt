@@ -9,3 +9,7 @@ pyjwt
 passlib[bcrypt]
 python-multipart
 python-dotenv
+Pillow>=10.0.0
+aiofiles>=23.0.0
+azure-storage-blob>=12.19.0
+aiohttp

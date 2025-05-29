@@ -20,4 +20,5 @@ class UserRead(BaseModel):
     id: int
     email: str
     fullname: str
+    profile_image_url: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
