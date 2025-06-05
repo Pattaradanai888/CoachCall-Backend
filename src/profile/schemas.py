@@ -1,7 +1,6 @@
 # src/profile/schemas.py
 from typing import Optional
 from pydantic import BaseModel, EmailStr, Field
-from fastapi import UploadFile
 
 
 class ProfileUpdate(BaseModel):

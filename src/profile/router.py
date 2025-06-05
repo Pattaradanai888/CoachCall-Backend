@@ -1,12 +1,12 @@
 # src/profile/router.py
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.database import get_async_session
 from src.profile.schemas import ProfileUpdate, PasswordUpdate, ProfileResponse
-from src.profile.service import update_profile, change_password, upload_profile_image, azure_blob_service, \
+from src.profile.service import update_profile, change_password, upload_profile_image, \
     delete_profile_image
 
 router = APIRouter()
