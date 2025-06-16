@@ -28,6 +28,12 @@ class ImageUploadService:
                 quality=85,
                 max_file_size=2 * 1024 * 1024
             ),
+            ImageType.ATHLETE: ImageConfig(  # Add athlete configuration
+                max_width=400,
+                max_height=400,
+                quality=85,
+                max_file_size=3 * 1024 * 1024  # 3MB for athlete images
+            ),
         }
 
     async def upload_image(
@@ -35,7 +41,8 @@ class ImageUploadService:
             file: UploadFile,
             image_type: ImageType,
             user_id: int,
-            subfolder: Optional[str] = None
+            subfolder: Optional[str] = None,
+            entity_id: Optional[int] = None  # For athlete images
     ) -> UploadResult:
         config = self.configs[image_type]
         container = upload_settings.PROFILE_IMAGES_CONTAINER
@@ -47,7 +54,7 @@ class ImageUploadService:
         if self._is_image_file(file.filename):
             content = self._process_image(content, config)
 
-        blob_name = self._generate_blob_name(image_type, user_id, file.filename, subfolder)
+        blob_name = self._generate_blob_name(image_type, user_id, file.filename, subfolder, entity_id)
 
         url = await self._upload_to_azure(content, blob_name, container)
 
@@ -123,20 +130,26 @@ class ImageUploadService:
             image_type: ImageType,
             user_id: int,
             filename: str,
-            subfolder: Optional[str] = None
+            subfolder: Optional[str] = None,
+            entity_id: Optional[int] = None
     ) -> str:
         file_id = str(uuid.uuid4())
         file_ext = os.path.splitext(filename)[1].lower()
 
         if image_type == ImageType.PROFILE:
             base_path = "profiles"
+            identifier = str(user_id)
+        elif image_type == ImageType.ATHLETE:
+            base_path = "athletes"
+            identifier = f"{user_id}_{entity_id}" if entity_id else str(user_id)
         else:
             base_path = "uploads"
+            identifier = str(user_id)
 
         if subfolder:
-            return f"{base_path}/{subfolder}/{user_id}_{file_id}{file_ext}"
+            return f"{base_path}/{subfolder}/{identifier}_{file_id}{file_ext}"
         else:
-            return f"{base_path}/{user_id}_{file_id}{file_ext}"
+            return f"{base_path}/{identifier}_{file_id}{file_ext}"
 
     async def _upload_to_azure(self, content: bytes, blob_name: str, container: str) -> str:
         try:

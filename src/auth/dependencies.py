@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-import jwt
+from sqlalchemy.orm import selectinload
 
 from src.auth.models import User
 from src.auth.utils import decode_access_token
@@ -22,13 +22,14 @@ async def get_current_user(
         email: str = payload.get("sub")
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token: Missing email/subject")
-    except HTTPException as http_exc: # Use a distinct variable name
+    except HTTPException as http_exc:
         raise http_exc
-    except Exception as generic_exc:  # Use a distinct variable name
-        # Use the exception variable from *this* block
+    except Exception as generic_exc:
         raise HTTPException(status_code=500, detail=f"Internal server error processing token: {str(generic_exc)}")
 
-    result = await db.execute(select(User).where(User.email == email))
+    # Eagerly load the user's profile to avoid extra queries later
+    query = select(User).where(User.email == email).options(selectinload(User.profile))
+    result = await db.execute(query)
     user = result.scalars().first()
 
     if user is None:

@@ -1,7 +1,7 @@
 # src/auth/schemas.py
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
 
 class UserCreate(BaseModel):
@@ -16,9 +16,13 @@ class Token(BaseModel):
     token_type: str = "bearer"
 
 
+class UserProfileRead(BaseModel):
+    display_name: str
+    profile_image_url: Optional[str] = None
+
 class UserRead(BaseModel):
     id: int
     email: str
-    fullname: str
-    profile_image_url: Optional[str] = None
+    profile: Optional[UserProfileRead] = None
+
     model_config = ConfigDict(from_attributes=True)

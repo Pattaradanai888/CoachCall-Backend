@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class ImageType(str, Enum):
     PROFILE = "profile"
+    ATHLETE = "athlete"
 
 
 class ImageConfig(BaseModel):
@@ -19,3 +20,6 @@ class UploadResult(BaseModel):
     url: str
     blob_name: str
     file_size: int
+
+class UploadResponse(BaseModel):
+    url: str

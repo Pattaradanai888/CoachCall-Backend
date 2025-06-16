@@ -12,6 +12,8 @@ from src.database import Base
 
 # Import all model modules to ensure they're registered with Base
 from src.auth import models as auth_models  # noqa
+from src.athlete import models as profile_models # noqa
+from src.course import models as course_models # noqa
 
 # Load .env file for general use (e.g., if Alembic CLI needs DATABASE_URL)
 load_dotenv()

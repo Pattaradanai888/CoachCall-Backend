@@ -16,11 +16,13 @@ async def update_profile(
         db: AsyncSession
 ) -> User:
     try:
+        # Check if the user has a profile, which they always should after registration
+        if not current_user.profile:
+            raise HTTPException(status_code=500, detail="User profile not found.")
+
         if profile_data.email and profile_data.email != current_user.email:
             from sqlalchemy import select
-            result = await db.execute(
-                select(User).where(User.email == profile_data.email)
-            )
+            result = await db.execute(select(User).where(User.email == profile_data.email))
             if result.scalars().first():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -28,8 +30,9 @@ async def update_profile(
                 )
             current_user.email = profile_data.email
 
+        # Update the display_name on the profile object
         if profile_data.fullname is not None:
-            current_user.fullname = profile_data.fullname
+            current_user.profile.display_name = profile_data.fullname
 
         await db.commit()
         await db.refresh(current_user)
@@ -45,7 +48,7 @@ async def update_profile(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update profile"
+            detail=f"Failed to update profile: {str(e)}"
         )
 
 
@@ -54,24 +57,22 @@ async def change_password(
         password_data: PasswordUpdate,
         db: AsyncSession
 ) -> None:
+    # This function is correct as it only deals with the User model. No changes needed.
     if not verify_password(password_data.current_password, current_user.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
-
     if password_data.new_password != password_data.confirm_password:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password and confirmation do not match"
         )
-
     if verify_password(password_data.new_password, current_user.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="New password must be different from current password"
         )
-
     try:
         current_user.password = hash_password(password_data.new_password)
         await db.commit()
@@ -89,8 +90,12 @@ async def upload_profile_image(
         db: AsyncSession
 ) -> str:
     try:
-        if hasattr(current_user, 'profile_image_url') and current_user.profile_image_url:
-            await image_upload_service.delete_image(current_user.profile_image_url)
+        if not current_user.profile:
+            raise HTTPException(status_code=500, detail="User profile not found.")
+
+        # Delete existing image if it exists on the profile
+        if current_user.profile.profile_image_url:
+            await image_upload_service.delete_image(current_user.profile.profile_image_url)
 
         upload_result = await image_upload_service.upload_image(
             file=file,
@@ -98,7 +103,8 @@ async def upload_profile_image(
             user_id=current_user.id
         )
 
-        current_user.profile_image_url = upload_result.url
+        # Update profile record, not the user record
+        current_user.profile.profile_image_url = upload_result.url
         await db.commit()
         await db.refresh(current_user)
 
@@ -115,16 +121,17 @@ async def upload_profile_image(
 
 
 async def delete_profile_image(current_user: User, db: AsyncSession) -> None:
-    if not hasattr(current_user, 'profile_image_url') or not current_user.profile_image_url:
+    if not current_user.profile or not current_user.profile.profile_image_url:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No profile image found"
         )
 
     try:
-        await image_upload_service.delete_image(current_user.profile_image_url)
+        await image_upload_service.delete_image(current_user.profile.profile_image_url)
 
-        current_user.profile_image_url = None
+        # Update profile record
+        current_user.profile.profile_image_url = None
         await db.commit()
         await db.refresh(current_user)
 
