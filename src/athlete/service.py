@@ -80,6 +80,15 @@ async def get_coach_athletes(user_id: int, db: AsyncSession, skip: int = 0, limi
     )
     return result.scalars().all()
 
+async def get_all_coach_athletes_for_selection(user_id: int, db: AsyncSession) -> Sequence[Athlete]:
+    result = await db.execute(
+        select(Athlete)
+        .where(Athlete.user_id == user_id)
+        .order_by(Athlete.name)
+        .options(selectinload(Athlete.positions))
+    )
+    return result.scalars().all()
+
 
 async def get_coach_athlete_by_uuid(user_id: int, athlete_uuid: _uuid.UUID, db: AsyncSession):
     query = (

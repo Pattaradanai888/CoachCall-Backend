@@ -4,32 +4,28 @@ from decimal import Decimal
 from typing import Optional, List
 from uuid import UUID
 
-from pydantic import BaseModel, model_validator
-
+from pydantic import BaseModel, model_validator, ConfigDict
 
 
 class GroupResponse(BaseModel):
     id: int
     name: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PositionResponse(BaseModel):
     id: int
     name: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExperienceLevelResponse(BaseModel):
     id: int
     name: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AthleteSkillResponse(BaseModel):
@@ -37,8 +33,7 @@ class AthleteSkillResponse(BaseModel):
     current_score: Decimal
     skill_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 
@@ -105,8 +100,7 @@ class AthleteResponse(AthleteBase):
     positions: List[PositionResponse] = []
     skill_levels: List[AthleteSkillResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AthleteListResponse(BaseModel):
@@ -117,8 +111,7 @@ class AthleteListResponse(BaseModel):
     position: str
     profile_image_url: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GroupCreate(BaseModel):
@@ -159,3 +152,11 @@ class AthleteCreationStat(BaseModel):
     trend: list[int]
     trend_detailed: List[TrendDataPoint]
     insights: AthleteInsights
+
+class AthleteSelectionResponse(BaseModel):
+    uuid: UUID
+    name: str
+    profile_image_url: Optional[str] = None
+    positions: List[PositionResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)

@@ -9,12 +9,13 @@ from src.database import get_async_session
 from . import service
 from .schemas import (
     AthleteCreate, AthleteResponse, AthleteListResponse, AthleteUpdate, GroupResponse,
-    AthleteCreationStat, GroupDeleteResponse, GroupCreate, PositionResponse, PositionCreate, PositionDeleteResponse
+    AthleteCreationStat, GroupDeleteResponse, GroupCreate, PositionResponse, PositionCreate, PositionDeleteResponse,
+    AthleteSelectionResponse
 )
 from .service import (
     create_athlete, get_coach_athletes, get_coach_athlete_by_uuid, update_athlete,
     delete_athlete, create_group, get_groups, delete_group, create_position, get_positions, delete_position,
-    delete_athlete_image, upload_athlete_image
+    delete_athlete_image, upload_athlete_image, get_all_coach_athletes_for_selection
 )
 from ..auth.dependencies import get_current_user
 from ..auth.models import User
@@ -76,10 +77,11 @@ async def get_latest_athlete(current_user: User = Depends(get_current_user),
         profile_image_url=latest_athlete.profile_image_url
     )
 
-
-@router.post("", response_model=AthleteResponse)
-async def create_new_athlete(athlete: AthleteCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
-    return await create_athlete(current_user.id, athlete, db)
+@router.get("/all", response_model=List[AthleteSelectionResponse])
+async def list_all_athletes_for_selection(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+    """Provides a lightweight list of all athletes for selection UI elements."""
+    athletes = await get_all_coach_athletes_for_selection(current_user.id, db)
+    return athletes
 
 
 @router.get("", response_model=List[AthleteListResponse])
@@ -101,6 +103,12 @@ async def list_athletes(skip: int = 0, limit: int = 5, current_user: User = Depe
             )
         )
     return response_list
+
+
+@router.post("", response_model=AthleteResponse)
+async def create_new_athlete(athlete: AthleteCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+    return await create_athlete(current_user.id, athlete, db)
+
 
 
 @router.get("/{athlete_uuid}", response_model=AthleteResponse)
