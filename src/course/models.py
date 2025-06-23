@@ -1,4 +1,4 @@
-# scr/course/models.py
+# src/course/models.py
 import datetime
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, Table
 from sqlalchemy.orm import relationship
@@ -21,6 +21,7 @@ class Course(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     cover_image_url = Column(String, nullable=True)
+    is_archived = Column(Boolean, default=False)
     start_date = Column(DateTime, nullable=True)
     end_date = Column(DateTime, nullable=True)
 
@@ -37,6 +38,8 @@ class Session(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     scheduled_date = Column(DateTime, nullable=False)
+    status = Column(String, nullable=False, default="To Do")
+    is_template = Column(Boolean, default=False)
 
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -46,6 +49,12 @@ class Session(Base):
     tasks = relationship("SessionTask", back_populates="session", cascade="all, delete-orphan",
                          order_by="SessionTask.sequence")
     attendance_records = relationship("SessionAttendee", back_populates="session", cascade="all, delete-orphan")
+
+    @property
+    def total_duration_minutes(self) -> int:
+        if not self.tasks:
+            return 0
+        return sum(st.task.duration_minutes for st in self.tasks if st.task and st.task.duration_minutes)
 
 
 class Task(Base):
@@ -78,6 +87,10 @@ class TaskSkillWeight(Base):
 
     task = relationship("Task", back_populates="skill_weights")
     skill = relationship("Skill")
+
+    @property
+    def skill_name(self) -> str:
+        return self.skill.name
 
 
 class SessionAttendee(Base):
