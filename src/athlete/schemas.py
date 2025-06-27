@@ -158,5 +158,7 @@ class AthleteSelectionResponse(BaseModel):
     name: str
     profile_image_url: Optional[str] = None
     positions: List[PositionResponse] = []
+    age: Optional[int] = None
+    groups: List[GroupResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

@@ -85,7 +85,10 @@ async def get_all_coach_athletes_for_selection(user_id: int, db: AsyncSession) -
         select(Athlete)
         .where(Athlete.user_id == user_id)
         .order_by(Athlete.name)
-        .options(selectinload(Athlete.positions))
+        .options(
+            selectinload(Athlete.positions),
+            selectinload(Athlete.groups)
+        )
     )
     return result.scalars().all()
 
