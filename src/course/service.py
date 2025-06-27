@@ -1,15 +1,15 @@
 # src/course/service.py
 
 from uuid import UUID as PyUUID
-from typing import Sequence, Optional, List
+from typing import Sequence, Optional, List, Any, Coroutine
 from fastapi import HTTPException
-from sqlalchemy import select, Row, RowMapping
+from sqlalchemy import select, Row, RowMapping, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.athlete.models import Athlete
-from .models import Course, Session, Task, Skill, SessionTask, TaskSkillWeight
-from .schemas import CourseCreate, SkillCreate
+from .models import Course, Session, Task, Skill, SessionTask, TaskSkillWeight, TaskCompletion
+from .schemas import CourseCreate, SkillCreate, SessionCreate, SessionCompletionPayload
 
 
 async def create_skill(user_id: int, skill_data: SkillCreate, db: AsyncSession) -> Skill:
@@ -33,11 +33,51 @@ async def get_sessions(user_id: int, is_template: bool, db: AsyncSession) -> Seq
             selectinload(Session.tasks)
             .selectinload(SessionTask.task)
             .selectinload(Task.skill_weights)
-            .selectinload(TaskSkillWeight.skill)
+            .selectinload(TaskSkillWeight.skill),
+            selectinload(Session.completions).selectinload(TaskCompletion.athlete)
         )
     )
     result = await db.execute(query)
-    return result.scalars().all()
+    return result.scalars().unique().all()
+
+
+async def create_session(user_id: int, session_data: SessionCreate, db: AsyncSession) -> Session:
+    all_skill_ids = {sw.skill_id for t in session_data.tasks for sw in t.skill_weights}
+    if all_skill_ids:
+        valid_skills_q = await db.execute(select(Skill).where(Skill.id.in_(all_skill_ids), Skill.user_id == user_id))
+        if len(valid_skills_q.scalars().all()) != len(all_skill_ids):
+            raise HTTPException(status_code=400, detail="One or more skill IDs are invalid.")
+
+    task_data_list = session_data.tasks
+    session_dict = session_data.model_dump(exclude={'tasks'})
+
+    if session_dict.get("scheduled_date"):
+        session_dict["scheduled_date"] = session_dict["scheduled_date"].replace(tzinfo=None)
+
+    db_session = Session(**session_dict, user_id=user_id)
+
+    for i, task_data in enumerate(task_data_list):
+        skill_weights_data = task_data.skill_weights
+        db_task = Task(
+            **task_data.model_dump(exclude={'skill_weights'}),
+            user_id=user_id
+        )
+        db_session.tasks.append(SessionTask(task=db_task, sequence=i + 1))
+        for sw_data in skill_weights_data:
+            db_task.skill_weights.append(TaskSkillWeight(**sw_data.model_dump()))
+
+    db.add(db_session)
+    await db.commit()
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == db_session.id)
+        .options(
+            selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
+                Task.skill_weights).selectinload(TaskSkillWeight.skill),
+            selectinload(Session.completions).selectinload(TaskCompletion.athlete)
+        )
+    )
+    return result.scalars().unique().one()
 
 
 async def create_course(user_id: int, course_data: CourseCreate, db: AsyncSession) -> Course:
@@ -46,10 +86,11 @@ async def create_course(user_id: int, course_data: CourseCreate, db: AsyncSessio
 
     all_skill_ids = {sw.skill_id for s in session_data_list for t in s.tasks for sw in t.skill_weights}
 
-    valid_skills_q = await db.execute(select(Skill).where(Skill.id.in_(all_skill_ids), Skill.user_id == user_id))
-    valid_skills = valid_skills_q.scalars().all()
-    if len(valid_skills) != len(all_skill_ids):
-        raise HTTPException(status_code=400, detail="One or more skill IDs are invalid or do not belong to you.")
+    if all_skill_ids:
+        valid_skills_q = await db.execute(select(Skill).where(Skill.id.in_(all_skill_ids), Skill.user_id == user_id))
+        valid_skills = valid_skills_q.scalars().all()
+        if len(valid_skills) != len(all_skill_ids):
+            raise HTTPException(status_code=400, detail="One or more skill IDs are invalid or do not belong to you.")
 
     valid_attendees = []
     if attendee_uuids:
@@ -101,12 +142,15 @@ async def create_course(user_id: int, course_data: CourseCreate, db: AsyncSessio
         .where(Course.id == db_course.id)
         .options(
             selectinload(Course.attendees).selectinload(Athlete.positions),
-            selectinload(Course.sessions).selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
-                Task.skill_weights).selectinload(TaskSkillWeight.skill)
+            selectinload(Course.sessions).options(
+                selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(Task.skill_weights).selectinload(TaskSkillWeight.skill),
+                # *** FIX 1: Eagerly load the athlete for each completion ***
+                selectinload(Session.completions).selectinload(TaskCompletion.athlete)
+            )
         )
     )
 
-    return result.scalars().one()
+    return result.scalars().unique().one()
 
 
 async def get_courses(user_id: int, db: AsyncSession, is_archived: bool = False) -> Sequence[Course]:
@@ -124,16 +168,16 @@ async def get_all_courses_with_details(user_id: int, db: AsyncSession) -> Sequen
         select(Course)
         .where(Course.user_id == user_id)
         .options(
-            selectinload(Course.sessions)
-            .selectinload(Session.tasks)
-            .selectinload(SessionTask.task)
-            .selectinload(Task.skill_weights)
-            .selectinload(TaskSkillWeight.skill),
+            selectinload(Course.sessions).options(
+                selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
+                    Task.skill_weights).selectinload(TaskSkillWeight.skill),
+                selectinload(Session.completions).selectinload(TaskCompletion.athlete)
+            ),
             selectinload(Course.attendees).selectinload(Athlete.positions)
         )
         .order_by(Course.start_date.desc())
     )
-    return result.scalars().all()
+    return result.scalars().unique().all()
 
 
 async def get_course_details(user_id: int, course_id: int, db: AsyncSession) -> Optional[Course]:
@@ -141,16 +185,17 @@ async def get_course_details(user_id: int, course_id: int, db: AsyncSession) -> 
         select(Course)
         .where(Course.id == course_id, Course.user_id == user_id)
         .options(
-            selectinload(Course.sessions)
-            .selectinload(Session.tasks)
-            .selectinload(SessionTask.task)
-            .selectinload(Task.skill_weights)
-            .selectinload(TaskSkillWeight.skill),
+            selectinload(Course.sessions).options(
+                selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
+                    Task.skill_weights).selectinload(TaskSkillWeight.skill),
+                # *** FIX 3: Eagerly load the athlete for each completion ***
+                selectinload(Session.completions).selectinload(TaskCompletion.athlete)
+            ),
             selectinload(Course.attendees).selectinload(Athlete.positions)
         )
     )
     result = await db.execute(query)
-    return result.scalars().first()
+    return result.scalars().unique().one_or_none()
 
 
 async def update_course_attendees(user_id: int, course_id: int, athlete_uuids: List[PyUUID],
@@ -173,3 +218,126 @@ async def update_course_attendees(user_id: int, course_id: int, athlete_uuids: L
     await db.commit()
     await db.refresh(db_course, attribute_names=['attendees', 'sessions'])
     return db_course
+
+
+async def update_session_status(user_id: int, session_id: int, new_status: str, db: AsyncSession) -> Session | None:
+    subquery = select(Session.id).where(Session.id == session_id, Session.user_id == user_id).scalar_subquery()
+
+    await db.execute(
+        update(Session)
+        .where(Session.id == subquery)
+        .values(status=new_status)
+    )
+    await db.commit()
+
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == session_id)
+        .options(
+            selectinload(Session.tasks)
+            .selectinload(SessionTask.task)
+            .selectinload(Task.skill_weights)
+            .selectinload(TaskSkillWeight.skill),
+            selectinload(Session.completions).selectinload(TaskCompletion.athlete)
+        )
+    )
+
+    updated_session = result.scalars().unique().one_or_none()
+
+    if not updated_session:
+        return None
+
+    return updated_session
+
+
+async def save_task_completions(user_id: int, session_id: int, payload: SessionCompletionPayload, db: AsyncSession) -> \
+        List[TaskCompletion]:
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == user_id)
+        .options(selectinload(Session.course))
+    )
+    session = result.scalars().one_or_none()
+    if not session or session.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.total_session_time_seconds = payload.totalSessionTime
+
+    athlete_uuids = [c.athlete_uuid for c in payload.completions]
+    athletes_q = await db.execute(select(Athlete).where(Athlete.uuid.in_(athlete_uuids), Athlete.user_id == user_id))
+    athletes_map = {str(a.uuid): a.id for a in athletes_q.scalars().all()}
+
+    if len(athletes_map) != len(set(athlete_uuids)):
+        raise HTTPException(status_code=400, detail="One or more athletes not found or do not belong to you.")
+
+    db_completions = []
+    for completion_data in payload.completions:
+        athlete_id = athletes_map.get(str(completion_data.athlete_uuid))
+        if athlete_id:
+            db_completion = TaskCompletion(
+                session_id=session_id,
+                athlete_id=athlete_id,
+                task_id=completion_data.task_id,
+                final_score=completion_data.score,
+                scores_breakdown=completion_data.scores,
+                notes=completion_data.notes,
+                time_seconds=completion_data.time
+            )
+            db_completions.append(db_completion)
+
+    db.add_all(db_completions)
+    await db.commit()
+    return db_completions
+
+
+async def get_session_report_data(user_id: int, session_id: int, db: AsyncSession) -> Optional[dict]:
+    query = (
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == user_id)
+        .options(
+            selectinload(Session.course).options(
+                selectinload(Course.attendees).selectinload(Athlete.positions),
+                selectinload(Course.sessions).options(
+                    selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
+                        Task.skill_weights).selectinload(TaskSkillWeight.skill),
+                    selectinload(Session.completions).selectinload(TaskCompletion.athlete)
+                )
+            ),
+            selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(Task.skill_weights).selectinload(
+                TaskSkillWeight.skill),
+            selectinload(Session.completions).options(
+                selectinload(TaskCompletion.athlete).selectinload(Athlete.positions),
+                selectinload(TaskCompletion.task)
+            )
+        )
+    )
+    result = await db.execute(query)
+    session = result.scalars().unique().one_or_none()
+
+    if not session or not session.course:
+        return None
+
+    evaluations = {}
+    participating_athlete_objects = {}
+    for completion in session.completions:
+        if not completion.athlete:
+            continue
+
+        eval_key = f"{completion.athlete.uuid}-{completion.task_id}"
+        evaluations[eval_key] = {
+            "scores": completion.scores_breakdown or {},
+            "notes": completion.notes,
+            "time": completion.time_seconds,
+        }
+        if completion.athlete.uuid not in participating_athlete_objects:
+            participating_athlete_objects[completion.athlete.uuid] = completion.athlete
+
+    report_data = {
+        "course": session.course,
+        "session": session,
+        "participatingAthletes": list(participating_athlete_objects.values()),
+        "evaluations": evaluations,
+        "totalSessionTime": session.total_session_time_seconds or 0,
+    }
+
+    return report_data

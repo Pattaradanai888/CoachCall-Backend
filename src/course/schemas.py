@@ -1,8 +1,8 @@
 # src/course/schemas.py
 
 from datetime import date, datetime
-from typing import List, Optional
-from pydantic import BaseModel, HttpUrl, Field, ConfigDict
+from typing import List, Optional, Dict
+from pydantic import BaseModel, HttpUrl, Field, ConfigDict, computed_field
 from decimal import Decimal
 from uuid import UUID
 
@@ -76,6 +76,16 @@ class SessionTaskRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TaskCompletionRead(BaseModel):
+    athlete_uuid: UUID
+    task_id: int
+    final_score: Decimal
+    scores_breakdown: Optional[Dict[str, float]] = None
+    notes: Optional[str] = None
+    time_seconds: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 class SessionRead(BaseModel):
     id: int
     name: str
@@ -84,15 +94,28 @@ class SessionRead(BaseModel):
     is_template: bool
     status: str
     tasks: List[SessionTaskRead]
+    completions: List[TaskCompletionRead] = []
+    total_duration_minutes: int
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def task_count(self) -> int:
+        return len(self.tasks)
 
 class SessionTemplateRead(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
     total_duration_minutes: int
+    tasks: List[SessionTaskRead]
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def task_count(self) -> int:
+        return len(self.tasks)
 
 
 class AttendeeResponse(BaseModel):
@@ -128,3 +151,33 @@ class CourseListRead(BaseModel):
     cover_image_url: Optional[str]
 
     model_config = ConfigDict(from_attributes=True)
+
+class FinalEvaluationData(BaseModel):
+    scores: Dict[str, float]
+    notes: Optional[str]
+    time: int
+
+class SessionReportData(BaseModel):
+    course: CourseRead
+    session: SessionRead
+    participatingAthletes: List[AttendeeResponse] = Field(..., alias="participatingAthletes")
+    evaluations: Dict[str, FinalEvaluationData]
+    totalSessionTime: int = Field(..., alias="totalSessionTime")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+class TaskCompletionCreate(BaseModel):
+    athlete_uuid: UUID
+    task_id: int
+    score: float = Field(..., ge=0, le=100)
+
+    scores: Dict[int, float]
+    notes: Optional[str] = None
+    time: int
+
+class SessionCompletionPayload(BaseModel):
+    completions: List[TaskCompletionCreate]
+    totalSessionTime: int
+
+class SessionStatusUpdate(BaseModel):
+    status: str

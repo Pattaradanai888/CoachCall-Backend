@@ -9,12 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.database import get_async_session
-from . import service
 from .schemas import (
-    CourseCreate, CourseRead, SkillCreate, SkillRead, CourseListRead, SessionRead, SessionTemplateRead
+    CourseCreate, CourseRead, SkillCreate, SkillRead, CourseListRead, SessionRead, SessionTemplateRead, SessionCreate,
+    SessionCompletionPayload, SessionStatusUpdate, SessionReportData
 )
-from .service import get_skills, create_skill, get_sessions, get_courses, create_course, get_all_courses_with_details, \
-    get_course_details, update_course_attendees
+from .service import (
+    get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
+    get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
+    update_session_status, get_session_report_data
+)
 
 router = APIRouter()
 
@@ -36,13 +39,23 @@ async def create_new_skill(
     return await create_skill(current_user.id, skill_data, db)
 
 
-@router.get("/sessions", response_model=List[SessionTemplateRead])
+@router.get("/sessions", response_model=List[SessionRead])
 async def list_sessions(
         is_template: bool = False,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_async_session)
 ):
-    return await get_sessions(user_id=current_user.id, is_template=is_template, db=db)
+    sessions = await get_sessions(user_id=current_user.id, is_template=is_template, db=db)
+    return sessions
+
+
+@router.post("/sessions", response_model=SessionRead, status_code=201)
+async def create_new_session(
+        session_data: SessionCreate,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    return await create_session(user_id=current_user.id, session_data=session_data, db=db)
 
 
 @router.get("", response_model=List[CourseListRead])
@@ -98,3 +111,45 @@ async def update_course_athletes(course_id: int, athlete_uuids: List[UUID],
                                  current_user: User = Depends(get_current_user),
                                  db: AsyncSession = Depends(get_async_session)):
     return await update_course_attendees(current_user.id, course_id, athlete_uuids, db)
+
+
+@router.put("/session/{session_id}/status", response_model=SessionRead)
+async def update_a_session_status(
+        session_id: int,
+        status_update: SessionStatusUpdate,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    updated_session = await update_session_status(
+        user_id=current_user.id,
+        session_id=session_id,
+        new_status=status_update.status,
+        db=db
+    )
+
+    if not updated_session:
+        raise HTTPException(status_code=404, detail="Session not found or you do not have permission.")
+
+    return updated_session
+
+@router.get("/session/{session_id}/report", response_model=SessionReportData)
+async def get_session_report(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    report_data = await get_session_report_data(user_id=current_user.id, session_id=session_id, db=db)
+    if not report_data:
+        raise HTTPException(status_code=404, detail="Session report not found or session is not complete.")
+    return report_data
+
+@router.post("/session/{session_id}/complete", status_code=201)
+async def complete_session_and_save_scores(
+        session_id: int,
+        payload: SessionCompletionPayload,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    await save_task_completions(user_id=current_user.id, session_id=session_id, payload=payload, db=db)
+    return {"message": "Session scores saved successfully."}
+

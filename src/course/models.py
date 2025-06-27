@@ -1,6 +1,8 @@
 # src/course/models.py
 import datetime
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, Table
+import uuid
+
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, Table, JSON
 from sqlalchemy.orm import relationship
 from src.database import Base
 
@@ -40,6 +42,7 @@ class Session(Base):
     scheduled_date = Column(DateTime, nullable=False)
     status = Column(String, nullable=False, default="To Do")
     is_template = Column(Boolean, default=False)
+    total_session_time_seconds = Column(Integer, nullable=True)
 
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -49,6 +52,7 @@ class Session(Base):
     tasks = relationship("SessionTask", back_populates="session", cascade="all, delete-orphan",
                          order_by="SessionTask.sequence")
     attendance_records = relationship("SessionAttendee", back_populates="session", cascade="all, delete-orphan")
+    completions = relationship("TaskCompletion", back_populates="session", cascade="all, delete-orphan")
 
     @property
     def total_duration_minutes(self) -> int:
@@ -109,9 +113,18 @@ class TaskCompletion(Base):
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False)
     athlete_id = Column(Integer, ForeignKey("athletes.id"), nullable=False)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
-    score = Column(Numeric(4, 2), nullable=False)
+
+    final_score = Column(Numeric(5, 2), nullable=False)
+    scores_breakdown = Column(JSON, nullable=True)
+    notes = Column(String, nullable=True)
+    time_seconds = Column(Integer, nullable=True)
+
     completed_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    session = relationship("Session")
+    session = relationship("Session", back_populates="completions")
     athlete = relationship("Athlete", back_populates="task_completions")
     task = relationship("Task")
+
+    @property
+    def athlete_uuid(self) -> uuid.UUID:
+        return self.athlete.uuid
