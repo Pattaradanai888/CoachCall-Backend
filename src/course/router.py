@@ -16,7 +16,8 @@ from .schemas import (
 from .service import (
     get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
     get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
-    update_session_status, get_session_report_data, upload_course_image, update_session, delete_session, update_course
+    update_session_status, get_session_report_data, upload_course_image, update_session, delete_session, update_course,
+    delete_course
 )
 from ..upload.schemas import UploadResponse
 
@@ -107,24 +108,6 @@ async def create_new_course(
     return db_course
 
 
-@router.put("/{course_id}", response_model=CourseRead)
-async def update_existing_course(
-        course_id: int,
-        course_data: CourseCreate,
-        current_user: User = Depends(get_current_user),
-        db: AsyncSession = Depends(get_async_session),
-):
-    return await update_course(user_id=current_user.id, course_id=course_id, course_data=course_data, db=db)
-
-
-@router.get("/details/all", response_model=List[CourseRead])
-async def get_all_course_details(
-        current_user: User = Depends(get_current_user),
-        db: AsyncSession = Depends(get_async_session)
-):
-    return await get_all_courses_with_details(current_user.id, db)
-
-
 @router.get("/{course_id}", response_model=CourseRead)
 async def get_course_detail(
         course_id: int,
@@ -135,6 +118,25 @@ async def get_course_detail(
     if not db_course:
         raise HTTPException(status_code=404, detail="Course not found")
     return db_course
+
+
+@router.delete("/{course_id}", status_code=status.HTTP_200_OK)
+async def remove_course(
+        course_id: int,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    return await delete_course(user_id=current_user.id, course_id=course_id, db=db)
+
+
+@router.put("/{course_id}", response_model=CourseRead)
+async def update_existing_course(
+        course_id: int,
+        course_data: CourseCreate,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session),
+):
+    return await update_course(user_id=current_user.id, course_id=course_id, course_data=course_data, db=db)
 
 
 @router.post("/{course_id}/upload-image", response_model=UploadResponse)
@@ -158,6 +160,14 @@ async def update_course_athletes(course_id: int, athlete_uuids: List[UUID],
                                  current_user: User = Depends(get_current_user),
                                  db: AsyncSession = Depends(get_async_session)):
     return await update_course_attendees(current_user.id, course_id, athlete_uuids, db)
+
+
+@router.get("/details/all", response_model=List[CourseRead])
+async def get_all_course_details(
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    return await get_all_courses_with_details(current_user.id, db)
 
 
 @router.put("/session/{session_id}/status", response_model=SessionRead)

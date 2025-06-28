@@ -220,7 +220,7 @@ async def get_courses(user_id: int, db: AsyncSession, is_archived: bool = False)
         select(Course)
         .where(Course.user_id == user_id, Course.is_archived == is_archived)
         .options(selectinload(Course.attendees))
-        .order_by(Course.start_date.desc())
+        .order_by(Course.start_date.desc(), Course.id.desc())
     )
     return result.scalars().all()
 
@@ -237,7 +237,7 @@ async def get_all_courses_with_details(user_id: int, db: AsyncSession) -> Sequen
             ),
             selectinload(Course.attendees).selectinload(Athlete.positions)
         )
-        .order_by(Course.start_date.desc())
+        .order_by(Course.start_date.desc(), Course.id.desc())
     )
     return result.scalars().unique().all()
 
@@ -318,6 +318,24 @@ async def update_course(user_id: int, course_id: int, course_data: CourseCreate,
         raise HTTPException(status_code=500, detail="Failed to retrieve updated course.")
 
     return updated_course
+
+
+async def delete_course(user_id: int, course_id: int, db: AsyncSession) -> dict:
+    result = await db.execute(
+        select(Course).where(Course.id == course_id, Course.user_id == user_id)
+    )
+    db_course = result.scalars().one_or_none()
+
+    if not db_course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found or you do not have permission to delete it."
+        )
+
+    await db.delete(db_course)
+    await db.commit()
+
+    return {"message": "Course deleted successfully", "deleted_course_id": course_id}
 
 
 async def update_course_attendees(user_id: int, course_id: int, athlete_uuids: List[PyUUID],
