@@ -16,7 +16,7 @@ from .schemas import (
 from .service import (
     get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
     get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
-    update_session_status, get_session_report_data, upload_course_image
+    update_session_status, get_session_report_data, upload_course_image, update_session
 )
 from ..upload.schemas import UploadResponse
 
@@ -57,6 +57,17 @@ async def create_new_session(
         db: AsyncSession = Depends(get_async_session)
 ):
     return await create_session(user_id=current_user.id, session_data=session_data, db=db)
+
+
+@router.put("/sessions/{session_id}", response_model=SessionRead)
+async def update_existing_session(
+        session_id: int,
+        session_data: SessionCreate,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    """Update a session template by its ID."""
+    return await update_session(user_id=current_user.id, session_id=session_id, session_data=session_data, db=db)
 
 
 @router.get("", response_model=List[CourseListRead])
@@ -106,12 +117,13 @@ async def get_course_detail(
         raise HTTPException(status_code=404, detail="Course not found")
     return db_course
 
+
 @router.post("/{course_id}/upload-image", response_model=UploadResponse)
 async def upload_a_course_cover_image(
-    course_id: int,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_session)
+        course_id: int,
+        file: UploadFile = File(...),
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
     """Endpoint to upload a cover image for a specific course."""
     image_url = await upload_course_image(
@@ -156,16 +168,18 @@ async def update_a_session_status(
 
     return updated_session
 
+
 @router.get("/session/{session_id}/report", response_model=SessionReportData)
 async def get_session_report(
-    session_id: int,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_session)
+        session_id: int,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
     report_data = await get_session_report_data(user_id=current_user.id, session_id=session_id, db=db)
     if not report_data:
         raise HTTPException(status_code=404, detail="Session report not found or session is not complete.")
     return report_data
+
 
 @router.post("/session/{session_id}/complete", status_code=201)
 async def complete_session_and_save_scores(
@@ -176,4 +190,3 @@ async def complete_session_and_save_scores(
 ):
     await save_task_completions(user_id=current_user.id, session_id=session_id, payload=payload, db=db)
     return {"message": "Session scores saved successfully."}
-

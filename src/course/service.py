@@ -83,6 +83,51 @@ async def create_session(user_id: int, session_data: SessionCreate, db: AsyncSes
     return result.scalars().unique().one()
 
 
+async def update_session(user_id: int, session_id: int, session_data: SessionCreate, db: AsyncSession) -> Session:
+    """Updates an existing session, typically used for templates."""
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == user_id)
+        .options(selectinload(Session.tasks))
+    )
+    db_session = result.scalars().unique().one_or_none()
+
+    if not db_session:
+        raise HTTPException(status_code=404, detail="Session not found or you do not have permission.")
+
+    db_session.name = session_data.name
+    db_session.description = session_data.description
+
+    db_session.tasks.clear()
+    await db.flush()
+
+    for i, task_data in enumerate(session_data.tasks):
+        skill_weights_data = task_data.skill_weights
+        db_task = Task(
+            **task_data.model_dump(exclude={'skill_weights'}),
+            user_id=user_id
+        )
+        session_task_link = SessionTask(task=db_task, sequence=i + 1)
+
+        for sw_data in skill_weights_data:
+            db_task.skill_weights.append(TaskSkillWeight(**sw_data.model_dump()))
+
+        db_session.tasks.append(session_task_link)
+
+    await db.commit()
+
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == db_session.id)
+        .options(
+            selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
+                Task.skill_weights).selectinload(TaskSkillWeight.skill),
+            selectinload(Session.completions).selectinload(TaskCompletion.athlete)
+        )
+    )
+    return result.scalars().unique().one()
+
+
 async def create_course(user_id: int, course_data: CourseCreate, db: AsyncSession) -> Course:
     session_data_list = course_data.sessions
     attendee_uuids = course_data.attendee_ids
