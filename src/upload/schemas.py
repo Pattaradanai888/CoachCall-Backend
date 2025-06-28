@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class ImageType(str, Enum):
     PROFILE = "profile"
     ATHLETE = "athlete"
+    COURSE = "course"
 
 
 class ImageConfig(BaseModel):

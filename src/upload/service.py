@@ -28,11 +28,17 @@ class ImageUploadService:
                 quality=85,
                 max_file_size=2 * 1024 * 1024
             ),
-            ImageType.ATHLETE: ImageConfig(  # Add athlete configuration
+            ImageType.ATHLETE: ImageConfig(
                 max_width=400,
                 max_height=400,
                 quality=85,
-                max_file_size=3 * 1024 * 1024  # 3MB for athlete images
+                max_file_size=3 * 1024 * 1024
+            ),
+            ImageType.COURSE: ImageConfig(
+                max_width=1600,  # Recommended 16:9 ratio
+                max_height=900,
+                quality=85,
+                max_file_size=5 * 1024 * 1024  # 5MB
             ),
         }
 
@@ -42,7 +48,7 @@ class ImageUploadService:
             image_type: ImageType,
             user_id: int,
             subfolder: Optional[str] = None,
-            entity_id: Optional[int] = None  # For athlete images
+            entity_id: Optional[int] = None
     ) -> UploadResult:
         config = self.configs[image_type]
         container = upload_settings.PROFILE_IMAGES_CONTAINER
@@ -142,6 +148,9 @@ class ImageUploadService:
         elif image_type == ImageType.ATHLETE:
             base_path = "athletes"
             identifier = f"{user_id}_{entity_id}" if entity_id else str(user_id)
+        elif image_type == ImageType.COURSE:
+            base_path = "courses"
+            identifier = f"{user_id}_{entity_id}" if entity_id else str(user_id)
         else:
             base_path = "uploads"
             identifier = str(user_id)
@@ -181,8 +190,10 @@ class ImageUploadService:
 
     def _extract_blob_name(self, url: str) -> Optional[str]:
         try:
-            return '/'.join(url.split('/')[-2:])
-        except:
+            if f"/{upload_settings.PROFILE_IMAGES_CONTAINER}/" in url:
+                return url.split(f"/{upload_settings.PROFILE_IMAGES_CONTAINER}/")[-1]
+            return None
+        except Exception:
             return None
 
 

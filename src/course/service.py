@@ -2,14 +2,17 @@
 
 from uuid import UUID as PyUUID
 from typing import Sequence, Optional, List, Any, Coroutine
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import select, Row, RowMapping, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette import status
 
 from src.athlete.models import Athlete
 from .models import Course, Session, Task, Skill, SessionTask, TaskSkillWeight, TaskCompletion
 from .schemas import CourseCreate, SkillCreate, SessionCreate, SessionCompletionPayload
+from ..upload.schemas import ImageType
+from ..upload.service import image_upload_service
 
 
 async def create_skill(user_id: int, skill_data: SkillCreate, db: AsyncSession) -> Skill:
@@ -341,3 +344,38 @@ async def get_session_report_data(user_id: int, session_id: int, db: AsyncSessio
     }
 
     return report_data
+
+async def upload_course_image(user_id: int, course_id: int, file: UploadFile, db: AsyncSession) -> str:
+    """Handles uploading a cover image for a course."""
+    db_course = await get_course_details(user_id, course_id, db)
+    if not db_course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found or you do not have permission."
+        )
+
+    try:
+        if db_course.cover_image_url:
+            await image_upload_service.delete_image(db_course.cover_image_url)
+
+        upload_result = await image_upload_service.upload_image(
+            file=file,
+            image_type=ImageType.COURSE,
+            user_id=user_id,
+            entity_id=course_id
+        )
+
+        db_course.cover_image_url = upload_result.url
+        await db.commit()
+        await db.refresh(db_course)
+
+        return upload_result.url
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload course image: {str(e)}"
+        )
