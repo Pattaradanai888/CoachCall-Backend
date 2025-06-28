@@ -1,12 +1,12 @@
 # src/course/service.py
 
+from typing import Sequence, Optional, List
 from uuid import UUID as PyUUID
-from typing import Sequence, Optional, List, Any, Coroutine
-from fastapi import HTTPException, UploadFile
-from sqlalchemy import select, Row, RowMapping, update
+
+from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from starlette import status
 
 from src.athlete.models import Athlete
 from .models import Course, Session, Task, Skill, SessionTask, TaskSkillWeight, TaskCompletion
@@ -84,7 +84,6 @@ async def create_session(user_id: int, session_data: SessionCreate, db: AsyncSes
 
 
 async def update_session(user_id: int, session_id: int, session_data: SessionCreate, db: AsyncSession) -> Session:
-    """Updates an existing session, typically used for templates."""
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id, Session.user_id == user_id)
@@ -126,6 +125,20 @@ async def update_session(user_id: int, session_id: int, session_data: SessionCre
         )
     )
     return result.scalars().unique().one()
+
+
+async def delete_session(user_id: int, session_id: int, db: AsyncSession) -> None:
+    result = await db.execute(
+        select(Session).where(Session.id == session_id, Session.user_id == user_id)
+    )
+    db_session = result.scalars().one_or_none()
+
+    if not db_session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session template not found.")
+
+    await db.delete(db_session)
+    await db.commit()
+    return
 
 
 async def create_course(user_id: int, course_data: CourseCreate, db: AsyncSession) -> Course:
@@ -191,7 +204,8 @@ async def create_course(user_id: int, course_data: CourseCreate, db: AsyncSessio
         .options(
             selectinload(Course.attendees).selectinload(Athlete.positions),
             selectinload(Course.sessions).options(
-                selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(Task.skill_weights).selectinload(TaskSkillWeight.skill),
+                selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
+                    Task.skill_weights).selectinload(TaskSkillWeight.skill),
                 # *** FIX 1: Eagerly load the athlete for each completion ***
                 selectinload(Session.completions).selectinload(TaskCompletion.athlete)
             )
@@ -390,8 +404,8 @@ async def get_session_report_data(user_id: int, session_id: int, db: AsyncSessio
 
     return report_data
 
+
 async def upload_course_image(user_id: int, course_id: int, file: UploadFile, db: AsyncSession) -> str:
-    """Handles uploading a cover image for a course."""
     db_course = await get_course_details(user_id, course_id, db)
     if not db_course:
         raise HTTPException(

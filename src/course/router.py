@@ -3,7 +3,7 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File , status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_user
@@ -16,7 +16,7 @@ from .schemas import (
 from .service import (
     get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
     get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
-    update_session_status, get_session_report_data, upload_course_image, update_session
+    update_session_status, get_session_report_data, upload_course_image, update_session, delete_session
 )
 from ..upload.schemas import UploadResponse
 
@@ -66,9 +66,17 @@ async def update_existing_session(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Update a session template by its ID."""
     return await update_session(user_id=current_user.id, session_id=session_id, session_data=session_data, db=db)
 
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_session_template(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    await delete_session(user_id=current_user.id, session_id=session_id, db=db)
+    return
 
 @router.get("", response_model=List[CourseListRead])
 async def list_courses(
@@ -125,7 +133,6 @@ async def upload_a_course_cover_image(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_async_session)
 ):
-    """Endpoint to upload a cover image for a specific course."""
     image_url = await upload_course_image(
         user_id=current_user.id,
         course_id=course_id,
