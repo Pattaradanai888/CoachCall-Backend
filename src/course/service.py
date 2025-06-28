@@ -260,6 +260,66 @@ async def get_course_details(user_id: int, course_id: int, db: AsyncSession) -> 
     return result.scalars().unique().one_or_none()
 
 
+async def update_course(user_id: int, course_id: int, course_data: CourseCreate, db: AsyncSession) -> Course:
+    db_course = await get_course_details(user_id, course_id, db)
+    if not db_course:
+        raise HTTPException(status_code=404, detail="Course not found or you don't have permission to edit it.")
+
+    update_data = course_data.model_dump(exclude={'sessions', 'attendee_ids', 'title', 'cover_image_url'})
+    db_course.name = course_data.name
+    for key, value in update_data.items():
+        setattr(db_course, key, value)
+
+    if course_data.cover_image_url:
+        db_course.cover_image_url = str(course_data.cover_image_url)
+
+    if course_data.attendee_ids is not None:
+        if course_data.attendee_ids:
+            valid_attendees_q = await db.execute(
+                select(Athlete).where(Athlete.uuid.in_(course_data.attendee_ids), Athlete.user_id == user_id)
+            )
+            db_course.attendees = valid_attendees_q.scalars().all()
+        else:
+            db_course.attendees = []
+
+    db_course.sessions.clear()
+    await db.flush()
+
+    for session_data in course_data.sessions:
+        task_data_list = session_data.tasks
+        session_dict = session_data.model_dump(exclude={'tasks'})
+        if session_dict.get("scheduled_date"):
+            session_dict["scheduled_date"] = session_dict["scheduled_date"].replace(tzinfo=None)
+
+        db_session = Session(
+            **session_dict,
+            user_id=user_id,
+            course_id=db_course.id
+        )
+
+        for i, task_data in enumerate(task_data_list):
+            skill_weights_data = task_data.skill_weights
+            db_task = Task(
+                **task_data.model_dump(exclude={'skill_weights'}),
+                user_id=user_id
+            )
+            session_task_link = SessionTask(task=db_task, sequence=i + 1)
+            db_session.tasks.append(session_task_link)
+
+            for sw_data in skill_weights_data:
+                db_task.skill_weights.append(TaskSkillWeight(**sw_data.model_dump()))
+
+        db.add(db_session)
+
+    await db.commit()
+
+    updated_course = await get_course_details(user_id, course_id, db)
+    if not updated_course:
+        raise HTTPException(status_code=500, detail="Failed to retrieve updated course.")
+
+    return updated_course
+
+
 async def update_course_attendees(user_id: int, course_id: int, athlete_uuids: List[PyUUID],
                                   db: AsyncSession) -> Course:
     db_course = await get_course_details(user_id, course_id, db)

@@ -3,20 +3,20 @@
 from typing import List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File , status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.database import get_async_session
 from .schemas import (
-    CourseCreate, CourseRead, SkillCreate, SkillRead, CourseListRead, SessionRead, SessionTemplateRead, SessionCreate,
+    CourseCreate, CourseRead, SkillCreate, SkillRead, CourseListRead, SessionRead, SessionCreate,
     SessionCompletionPayload, SessionStatusUpdate, SessionReportData
 )
 from .service import (
     get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
     get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
-    update_session_status, get_session_report_data, upload_course_image, update_session, delete_session
+    update_session_status, get_session_report_data, upload_course_image, update_session, delete_session, update_course
 )
 from ..upload.schemas import UploadResponse
 
@@ -71,12 +71,13 @@ async def update_existing_session(
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_session_template(
-    session_id: int,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_async_session)
+        session_id: int,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
 ):
     await delete_session(user_id=current_user.id, session_id=session_id, db=db)
     return
+
 
 @router.get("", response_model=List[CourseListRead])
 async def list_courses(
@@ -104,6 +105,16 @@ async def create_new_course(
 ):
     db_course = await create_course(current_user.id, course_data, db)
     return db_course
+
+
+@router.put("/{course_id}", response_model=CourseRead)
+async def update_existing_course(
+        course_id: int,
+        course_data: CourseCreate,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session),
+):
+    return await update_course(user_id=current_user.id, course_id=course_id, course_data=course_data, db=db)
 
 
 @router.get("/details/all", response_model=List[CourseRead])
@@ -140,13 +151,6 @@ async def upload_a_course_cover_image(
         db=db
     )
     return {"url": image_url}
-
-
-@router.put("/{course_id}/athletes", response_model=CourseRead)
-async def update_course_athletes(course_id: int, athlete_uuids: List[UUID],
-                                 current_user: User = Depends(get_current_user),
-                                 db: AsyncSession = Depends(get_async_session)):
-    return await update_course_attendees(current_user.id, course_id, athlete_uuids, db)
 
 
 @router.put("/{course_id}/athletes", response_model=CourseRead)
