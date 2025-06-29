@@ -356,8 +356,12 @@ async def update_course_attendees(user_id: int, course_id: int, athlete_uuids: L
         db_course.attendees = []
 
     await db.commit()
-    await db.refresh(db_course, attribute_names=['attendees', 'sessions'])
-    return db_course
+
+    updated_course = await get_course_details(user_id, course_id, db)
+    if not updated_course:
+        raise HTTPException(status_code=500, detail="Failed to retrieve updated course details after update.")
+
+    return updated_course
 
 
 async def update_session_status(user_id: int, session_id: int, new_status: str, db: AsyncSession) -> Session | None:
