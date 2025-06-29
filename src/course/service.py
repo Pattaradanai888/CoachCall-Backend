@@ -45,6 +45,23 @@ async def get_sessions(user_id: int, is_template: bool, db: AsyncSession) -> Seq
     return result.scalars().unique().all()
 
 
+async def get_session_by_id(user_id: int, session_id: int, db: AsyncSession) -> Optional[Session]:
+    query = (
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == user_id)
+        .options(
+            selectinload(Session.tasks)
+            .selectinload(SessionTask.task)
+            .selectinload(Task.skill_weights)
+            .selectinload(TaskSkillWeight.skill),
+            selectinload(Session.completions).selectinload(TaskCompletion.athlete),
+            selectinload(Session.course)
+        )
+    )
+    result = await db.execute(query)
+    return result.scalars().unique().one_or_none()
+
+
 async def create_session(user_id: int, session_data: SessionCreate, db: AsyncSession) -> Session:
     all_skill_ids = {sw.skill_id for t in session_data.tasks for sw in t.skill_weights}
     if all_skill_ids:
@@ -464,7 +481,14 @@ async def get_session_report_data(user_id: int, session_id: int, db: AsyncSessio
         select(Session)
         .where(Session.id == session_id, Session.user_id == user_id)
         .options(
-            selectinload(Session.course),
+            selectinload(Session.course).options(
+                selectinload(Course.attendees).selectinload(Athlete.positions),
+                selectinload(Course.sessions).options(
+                    selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
+                        Task.skill_weights).selectinload(TaskSkillWeight.skill),
+                    selectinload(Session.completions).selectinload(TaskCompletion.athlete)
+                )
+            ),
             selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(Task.skill_weights).selectinload(
                 TaskSkillWeight.skill),
             selectinload(Session.completions).options(

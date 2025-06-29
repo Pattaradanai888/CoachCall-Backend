@@ -17,7 +17,7 @@ from .service import (
     get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
     get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
     update_session_status, get_session_report_data, upload_course_image, update_session, delete_session, update_course,
-    delete_course, get_all_events, update_course_archive_status
+    delete_course, get_all_events, update_course_archive_status, get_session_by_id
 )
 from ..upload.schemas import UploadResponse
 
@@ -58,6 +58,18 @@ async def create_new_session(
         db: AsyncSession = Depends(get_async_session)
 ):
     return await create_session(user_id=current_user.id, session_data=session_data, db=db)
+
+
+@router.get("/sessions/{session_id}", response_model=SessionRead)
+async def get_single_session(
+        session_id: int,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    session = await get_session_by_id(user_id=current_user.id, session_id=session_id, db=db)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found or you do not have permission.")
+    return session
 
 
 @router.put("/sessions/{session_id}", response_model=SessionRead)
