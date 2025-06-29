@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from src.athlete.models import Athlete
 from .models import Course, Session, Task, Skill, SessionTask, TaskSkillWeight, TaskCompletion
-from .schemas import CourseCreate, SkillCreate, SessionCreate, SessionCompletionPayload
+from .schemas import CourseCreate, SkillCreate, SessionCreate, SessionCompletionPayload, EventItem
 from ..upload.schemas import ImageType
 from ..upload.service import image_upload_service
 
@@ -439,14 +439,7 @@ async def get_session_report_data(user_id: int, session_id: int, db: AsyncSessio
         select(Session)
         .where(Session.id == session_id, Session.user_id == user_id)
         .options(
-            selectinload(Session.course).options(
-                selectinload(Course.attendees).selectinload(Athlete.positions),
-                selectinload(Course.sessions).options(
-                    selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(
-                        Task.skill_weights).selectinload(TaskSkillWeight.skill),
-                    selectinload(Session.completions).selectinload(TaskCompletion.athlete)
-                )
-            ),
+            selectinload(Session.course),
             selectinload(Session.tasks).selectinload(SessionTask.task).selectinload(Task.skill_weights).selectinload(
                 TaskSkillWeight.skill),
             selectinload(Session.completions).options(
@@ -458,7 +451,7 @@ async def get_session_report_data(user_id: int, session_id: int, db: AsyncSessio
     result = await db.execute(query)
     session = result.scalars().unique().one_or_none()
 
-    if not session or not session.course:
+    if not session:
         return None
 
     evaluations = {}
@@ -520,3 +513,28 @@ async def upload_course_image(user_id: int, course_id: int, file: UploadFile, db
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload course image: {str(e)}"
         )
+
+
+async def get_all_events(user_id: int, db: AsyncSession) -> List[EventItem]:
+    query = (
+        select(Session)
+        .options(selectinload(Session.course))
+        .where(Session.user_id == user_id, Session.is_template == False)
+        .order_by(Session.scheduled_date.desc())
+    )
+    result = await db.execute(query)
+    sessions = result.scalars().unique().all()
+
+    event_list = []
+    for s in sessions:
+        event_list.append(EventItem(
+            id=s.id,
+            title=s.name,
+            date=s.scheduled_date,
+            is_complete=s.status == 'Complete',
+            type="course" if s.course_id else "quick_session",
+            course_id=s.course_id,
+            course_name=s.course.name if s.course else None
+        ))
+
+    return event_list

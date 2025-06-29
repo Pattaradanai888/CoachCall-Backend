@@ -44,7 +44,7 @@ class Session(Base):
     is_template = Column(Boolean, default=False)
     total_session_time_seconds = Column(Integer, nullable=True)
 
-    course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
+    course_id = Column(Integer, ForeignKey("courses.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     course = relationship("Course", back_populates="sessions")

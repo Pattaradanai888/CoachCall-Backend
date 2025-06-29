@@ -1,7 +1,7 @@
 # src/course/schemas.py
 
 from datetime import date, datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Literal
 from pydantic import BaseModel, HttpUrl, Field, ConfigDict, computed_field
 from decimal import Decimal
 from uuid import UUID
@@ -158,7 +158,7 @@ class FinalEvaluationData(BaseModel):
     time: int
 
 class SessionReportData(BaseModel):
-    course: CourseRead
+    course: Optional[CourseRead] = None
     session: SessionRead
     participatingAthletes: List[AttendeeResponse] = Field(..., alias="participatingAthletes")
     evaluations: Dict[str, FinalEvaluationData]
@@ -178,6 +178,17 @@ class TaskCompletionCreate(BaseModel):
 class SessionCompletionPayload(BaseModel):
     completions: List[TaskCompletionCreate]
     totalSessionTime: int
+
+class EventItem(BaseModel):
+    id: int
+    title: str
+    date: datetime
+    type: Literal["course", "quick_session"]
+    is_complete: bool
+    course_id: Optional[int] = None
+    course_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 class SessionStatusUpdate(BaseModel):
     status: str

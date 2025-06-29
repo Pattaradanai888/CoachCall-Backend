@@ -11,13 +11,13 @@ from src.auth.models import User
 from src.database import get_async_session
 from .schemas import (
     CourseCreate, CourseRead, SkillCreate, SkillRead, CourseListRead, SessionRead, SessionCreate,
-    SessionCompletionPayload, SessionStatusUpdate, SessionReportData
+    SessionCompletionPayload, SessionStatusUpdate, SessionReportData, EventItem
 )
 from .service import (
     get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
     get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
     update_session_status, get_session_report_data, upload_course_image, update_session, delete_session, update_course,
-    delete_course
+    delete_course, get_all_events
 )
 from ..upload.schemas import UploadResponse
 
@@ -188,6 +188,13 @@ async def update_a_session_status(
         raise HTTPException(status_code=404, detail="Session not found or you do not have permission.")
 
     return updated_session
+
+@router.get("/events/all", response_model=List[EventItem])
+async def list_all_events_for_calendar(
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    return await get_all_events(user_id=current_user.id, db=db)
 
 
 @router.get("/session/{session_id}/report", response_model=SessionReportData)
