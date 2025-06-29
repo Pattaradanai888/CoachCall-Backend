@@ -11,13 +11,13 @@ from src.auth.models import User
 from src.database import get_async_session
 from .schemas import (
     CourseCreate, CourseRead, SkillCreate, SkillRead, CourseListRead, SessionRead, SessionCreate,
-    SessionCompletionPayload, SessionStatusUpdate, SessionReportData, EventItem
+    SessionCompletionPayload, SessionStatusUpdate, SessionReportData, EventItem, CourseArchiveStatusUpdate
 )
 from .service import (
     get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
     get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
     update_session_status, get_session_report_data, upload_course_image, update_session, delete_session, update_course,
-    delete_course, get_all_events
+    delete_course, get_all_events, update_course_archive_status
 )
 from ..upload.schemas import UploadResponse
 
@@ -139,6 +139,21 @@ async def update_existing_course(
     return await update_course(user_id=current_user.id, course_id=course_id, course_data=course_data, db=db)
 
 
+@router.put("/{course_id}/archive-status", response_model=CourseRead)
+async def update_course_status(
+        course_id: int,
+        status_update: CourseArchiveStatusUpdate,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session),
+):
+    return await update_course_archive_status(
+        user_id=current_user.id,
+        course_id=course_id,
+        status_update=status_update,
+        db=db
+    )
+
+
 @router.post("/{course_id}/upload-image", response_model=UploadResponse)
 async def upload_a_course_cover_image(
         course_id: int,
@@ -188,6 +203,7 @@ async def update_a_session_status(
         raise HTTPException(status_code=404, detail="Session not found or you do not have permission.")
 
     return updated_session
+
 
 @router.get("/events/all", response_model=List[EventItem])
 async def list_all_events_for_calendar(

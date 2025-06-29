@@ -192,3 +192,6 @@ class EventItem(BaseModel):
 
 class SessionStatusUpdate(BaseModel):
     status: str
+
+class CourseArchiveStatusUpdate(BaseModel):
+    is_archived: bool

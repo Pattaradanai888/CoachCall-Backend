@@ -10,7 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from src.athlete.models import Athlete
 from .models import Course, Session, Task, Skill, SessionTask, TaskSkillWeight, TaskCompletion
-from .schemas import CourseCreate, SkillCreate, SessionCreate, SessionCompletionPayload, EventItem
+from .schemas import CourseCreate, SkillCreate, SessionCreate, SessionCompletionPayload, EventItem, \
+    CourseArchiveStatusUpdate
 from ..upload.schemas import ImageType
 from ..upload.service import image_upload_service
 
@@ -336,6 +337,30 @@ async def delete_course(user_id: int, course_id: int, db: AsyncSession) -> dict:
     await db.commit()
 
     return {"message": "Course deleted successfully", "deleted_course_id": course_id}
+
+
+async def update_course_archive_status(user_id: int, course_id: int, status_update: CourseArchiveStatusUpdate,
+                                       db: AsyncSession) -> Course:
+    stmt = (
+        update(Course)
+        .where(Course.id == course_id, Course.user_id == user_id)
+        .values(is_archived=status_update.is_archived)
+    )
+    result = await db.execute(stmt)
+
+    if result.rowcount == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found or you do not have permission."
+        )
+
+    await db.commit()
+
+    updated_course = await get_course_details(user_id=user_id, course_id=course_id, db=db)
+    if not updated_course:
+        raise HTTPException(status_code=500, detail="Could not retrieve updated course details.")
+
+    return updated_course
 
 
 async def update_course_attendees(user_id: int, course_id: int, athlete_uuids: List[PyUUID],
