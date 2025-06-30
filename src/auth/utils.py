@@ -2,8 +2,8 @@
 import jwt
 from datetime import datetime, timedelta
 
-from fastapi import HTTPException
-from jwt import PyJWTError
+from fastapi import HTTPException, status
+from jwt import PyJWTError, ExpiredSignatureError, InvalidTokenError
 
 from src.auth.config import auth_settings
 from passlib.context import CryptContext
@@ -13,6 +13,10 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def create_access_token(data: dict) -> str:
@@ -30,12 +34,19 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_access_token(token: str):
+    """
+    Decodes a JWT token, raising specific HTTPExceptions for common errors.
+    """
     try:
         payload = jwt.decode(token, auth_settings.JWT_SECRET, algorithms=[auth_settings.JWT_ALGORITHM])
         return payload
-    except PyJWTError as e:
-        raise HTTPException(status_code=401, detail=f"Could not validate token: {str(e)}")
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired"
+        )
+    except InvalidTokenError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Could not validate token: {e}"
+        )

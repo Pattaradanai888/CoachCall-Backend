@@ -16,7 +16,6 @@ async def update_profile(
         db: AsyncSession
 ) -> User:
     try:
-        # Check if the user has a profile, which they always should after registration
         if not current_user.profile:
             raise HTTPException(status_code=500, detail="User profile not found.")
 
@@ -30,13 +29,16 @@ async def update_profile(
                 )
             current_user.email = profile_data.email
 
-        # Update the display_name on the profile object
         if profile_data.fullname is not None:
             current_user.profile.display_name = profile_data.fullname
 
         await db.commit()
         await db.refresh(current_user)
         return current_user
+
+    except HTTPException:
+        await db.rollback()
+        raise
 
     except IntegrityError:
         await db.rollback()

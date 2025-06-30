@@ -1,8 +1,9 @@
 # src/auth/service.py
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException, status
+from sqlalchemy.orm import selectinload
 
 from src.auth.models import User, UserProfile
 from src.auth.schemas import Token, UserCreate
@@ -17,28 +18,30 @@ from src.auth.utils import (
 
 async def register_user(user: UserCreate, db: AsyncSession):
     hashed_password = hash_password(user.password)
-    db_user = User(email=user.email, password=hashed_password)
+    db_user = User(
+        email=user.email,
+        password=hashed_password,
+        profile=UserProfile(display_name=user.fullname)
+    )
     db.add(db_user)
     try:
         await db.commit()
         await db.refresh(db_user)
 
-        db_user_profile = UserProfile(
-            user_id=db_user.id,
-            display_name=user.fullname
-        )
-        db.add(db_user_profile)
-        await db.commit()
-
-        # THIS IS THE FIX: Refresh the user again to load the new profile
-        await db.refresh(db_user, attribute_names=["profile"])
-
-        return db_user
+        stmt = select(User).options(selectinload(User.profile)).where(User.id == db_user.id)
+        result = await db.execute(stmt)
+        return result.scalars().first()
     except IntegrityError:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered",
+        )
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during registration."
         )
 
 
@@ -46,7 +49,7 @@ async def login_user(email: str, password: str, db: AsyncSession) -> Token:
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalars().first()
     if not user or not verify_password(password, user.password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+        raise HTTPException(status_code=400, detail="Invalid email or password")
 
     access = create_access_token({"sub": user.email})
     refresh = create_refresh_token({"sub": user.email})
@@ -55,14 +58,22 @@ async def login_user(email: str, password: str, db: AsyncSession) -> Token:
 
 async def refresh_tokens(old_refresh: str) -> Token:
     if not old_refresh:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token")
-    try:
-        payload = decode_access_token(old_refresh)
-    except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No refresh token provided"
+        )
 
-    access = create_access_token({"sub": payload["sub"]})
-    refresh = create_refresh_token({"sub": payload["sub"]})
+    payload = decode_access_token(old_refresh)
+
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token: Subject claim missing"
+        )
+
+    access = create_access_token({"sub": email})
+    refresh = create_refresh_token({"sub": email})
     return Token(access_token=access, refresh_token=refresh, token_type="bearer")
 
 
