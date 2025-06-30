@@ -1,13 +1,14 @@
 # src/athlete/models.py
-import datetime
 import enum
 import uuid
+
 from sqlalchemy import (
     Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric,
-    Enum as SQLAlchemyEnum, Table
+    Enum as SQLAlchemyEnum, Table, func, Date
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
 from sqlalchemy.orm import relationship
+
 from src.database import Base
 
 athlete_group_association = Table('athlete_group_association', Base.metadata,
@@ -25,36 +26,48 @@ course_attendees = Table('course_attendees', Base.metadata,
 
 
 class DominantHandEnum(str, enum.Enum):
-    right = "Right"
-    left = "Left"
-    ambidextrous = "Ambidextrous"
+    RIGHT = "R"
+    LEFT = "L"
+    AMBIDEXTROUS = "A"
+
+    @property
+    def display_name(self):
+        return {"R": "Right", "L": "Left", "A": "Ambidextrous"}[self.value]
 
 
 class Athlete(Base):
     __tablename__ = "athletes"
     id = Column(Integer, primary_key=True)
+
     uuid = Column(PostgresUUID(as_uuid=True), default=uuid.uuid4, unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    is_active = Column(Boolean, default=True)
+
     name = Column(String(100), nullable=False)
+    date_of_birth = Column(Date, nullable=False)
+
     preferred_name = Column(String(50), nullable=True)
     dominant_hand = Column(SQLAlchemyEnum(DominantHandEnum), nullable=True)
     age = Column(Integer)
     height = Column(Integer)
     weight = Column(Integer)
-    date_of_birth = Column(DateTime, nullable=False)
+    jersey_number = Column(Integer, nullable=True)
+
     phone_number = Column(String(20))
     emergency_contact_name = Column(String(100))
     emergency_contact_phone = Column(String(20))
     profile_image_url = Column(String(500))
     notes = Column(String(1000))
-    jersey_number = Column(Integer, nullable=True)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # Foreign keys
+    experience_level_id = Column(Integer, ForeignKey("experience_levels.id"), nullable=True)
+
+    # Timestamps last
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+
     user = relationship("User", back_populates="athletes")
 
-    experience_level_id = Column(Integer, ForeignKey("experience_levels.id"), nullable=True)
     experience_level = relationship("ExperienceLevel", back_populates="athletes")
 
     groups = relationship("Group", secondary=athlete_group_association, back_populates="athletes")

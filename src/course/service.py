@@ -72,9 +72,6 @@ async def create_session(user_id: int, session_data: SessionCreate, db: AsyncSes
     task_data_list = session_data.tasks
     session_dict = session_data.model_dump(exclude={'tasks'})
 
-    if session_dict.get("scheduled_date"):
-        session_dict["scheduled_date"] = session_dict["scheduled_date"].replace(tzinfo=None)
-
     db_session = Session(**session_dict, user_id=user_id)
 
     for i, task_data in enumerate(task_data_list):
@@ -193,8 +190,6 @@ async def create_course(user_id: int, course_data: CourseCreate, db: AsyncSessio
     for session_data in session_data_list:
         task_data_list = session_data.tasks
         session_dict = session_data.model_dump(exclude={'tasks'})
-        if session_dict.get("scheduled_date"):
-            session_dict["scheduled_date"] = session_dict["scheduled_date"].replace(tzinfo=None)
         db_session = Session(
             **session_dict,
             user_id=user_id,
@@ -306,8 +301,6 @@ async def update_course(user_id: int, course_id: int, course_data: CourseCreate,
     for session_data in course_data.sessions:
         task_data_list = session_data.tasks
         session_dict = session_data.model_dump(exclude={'tasks'})
-        if session_dict.get("scheduled_date"):
-            session_dict["scheduled_date"] = session_dict["scheduled_date"].replace(tzinfo=None)
 
         db_session = Session(
             **session_dict,

@@ -2,7 +2,8 @@
 import datetime
 import uuid
 
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, Table, JSON
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric
 from sqlalchemy.orm import relationship
 from src.database import Base
 
@@ -24,8 +25,8 @@ class Course(Base):
     description = Column(String, nullable=True)
     cover_image_url = Column(String, nullable=True)
     is_archived = Column(Boolean, default=False)
-    start_date = Column(DateTime, nullable=True)
-    end_date = Column(DateTime, nullable=True)
+    start_date = Column(DateTime(timezone=True), nullable=True)
+    end_date = Column(DateTime(timezone=True), nullable=True)
 
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User", back_populates="courses")
@@ -39,7 +40,7 @@ class Session(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
-    scheduled_date = Column(DateTime, nullable=False)
+    scheduled_date = Column(DateTime(timezone=True), nullable=False)
     status = Column(String, nullable=False, default="To Do")
     is_template = Column(Boolean, default=False)
     total_session_time_seconds = Column(Integer, nullable=True)
@@ -115,11 +116,11 @@ class TaskCompletion(Base):
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
 
     final_score = Column(Numeric(5, 2), nullable=False)
-    scores_breakdown = Column(JSON, nullable=True)
+    scores_breakdown = Column(JSONB, nullable=True)
     notes = Column(String, nullable=True)
     time_seconds = Column(Integer, nullable=True)
 
-    completed_at = Column(DateTime, default=datetime.datetime.utcnow)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
 
     session = relationship("Session", back_populates="completions")
     athlete = relationship("Athlete", back_populates="task_completions")

@@ -1,6 +1,6 @@
 # src/athlete/service.py
 import uuid as _uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytz
 from typing import Sequence, Optional
 
@@ -17,7 +17,6 @@ from .schemas import AthleteCreate, AthleteUpdate
 
 async def create_athlete(user_id: int, athlete: AthleteCreate, db: AsyncSession):
     athlete_data = athlete.model_dump(exclude={"group_ids", "position_ids", "experience_level_id"})
-    athlete_data["date_of_birth"] = datetime.combine(athlete.date_of_birth, datetime.min.time())
 
     db_athlete = Athlete(**athlete_data, user_id=user_id)
 
@@ -118,8 +117,6 @@ async def update_athlete(user_id: int, athlete_uuid: _uuid.UUID, athlete: Athlet
     # Get data for simple fields, excluding M2M relationships
     update_data = athlete.model_dump(exclude_unset=True, exclude={'group_ids', 'position_ids'})
 
-    if 'date_of_birth' in update_data and update_data['date_of_birth']:
-        update_data['date_of_birth'] = datetime.combine(update_data['date_of_birth'], datetime.min.time())
 
     # Update simple attributes
     for key, value in update_data.items():
@@ -233,19 +230,19 @@ async def delete_position(position_id: int, user_id: int, db: AsyncSession):
 
 
 async def get_athlete_stats(user_id: int, db: AsyncSession):
-    now = datetime.now()
-    today = now.date()
+    now_utc = datetime.now(timezone.utc)
+    today_utc = now_utc.date()
 
     # Time periods
-    seven_days_ago = today - timedelta(days=7)
-    month_ago = today - timedelta(days=30)
-    six_days_ago = today - timedelta(days=6)
+    seven_days_ago = today_utc - timedelta(days=7)
+    month_ago = today_utc - timedelta(days=30)
+    six_days_ago = today_utc - timedelta(days=6)
 
     # Convert to datetime for comparison
-    today_start = datetime.combine(today, datetime.min.time())
-    seven_days_ago_start = datetime.combine(seven_days_ago, datetime.min.time())
-    six_days_ago_start = datetime.combine(six_days_ago, datetime.min.time())
-    month_start = datetime.combine(month_ago, datetime.min.time())
+    today_start = datetime.combine(today_utc, datetime.min.time(), tzinfo=timezone.utc)
+    seven_days_ago_start = datetime.combine(seven_days_ago, datetime.min.time(), tzinfo=timezone.utc)
+    six_days_ago_start = datetime.combine(six_days_ago, datetime.min.time(), tzinfo=timezone.utc)
+    month_start = datetime.combine(month_ago, datetime.min.time(), tzinfo=timezone.utc)
 
     # Basic counts
     today_count = await db.scalar(
