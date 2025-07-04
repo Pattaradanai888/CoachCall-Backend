@@ -1,10 +1,11 @@
 # src/course/service.py
 
+import datetime
 from typing import Sequence, Optional, List
 from uuid import UUID as PyUUID
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import select, update
+from sqlalchemy import select, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -149,7 +150,8 @@ async def delete_session(user_id: int, session_id: int, db: AsyncSession) -> Non
     db_session = result.scalars().one_or_none()
 
     if not db_session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session template not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Session not found or you do not have permission.")
 
     await db.delete(db_session)
     await db.commit()
@@ -238,7 +240,40 @@ async def get_courses(user_id: int, db: AsyncSession, is_archived: bool = False)
     return result.scalars().all()
 
 
+async def confirm_session(user_id: int, session_id: int, db: AsyncSession) -> Session:
+    stmt = (
+        update(Session)
+        .where(Session.id == session_id, Session.user_id == user_id, Session.status == "Pending")
+        .values(status="To Do")
+        .returning(Session.id)
+    )
+    result = await db.execute(stmt)
+    updated_id = result.scalar_one_or_none()
+
+    if not updated_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pending session not found or you do not have permission."
+        )
+
+    await db.commit()
+
+    return await get_session_by_id(user_id=user_id, session_id=session_id, db=db)
+
+
+async def cleanup_pending_sessions(db: AsyncSession):
+    threshold = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=24)
+    stmt = (
+        delete(Session)
+        .where(Session.status == "Pending", Session.scheduled_date < threshold)
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+
 async def get_all_courses_with_details(user_id: int, db: AsyncSession) -> Sequence[Course]:
+    await cleanup_pending_sessions(db)
+
     result = await db.execute(
         select(Course)
         .where(Course.user_id == user_id)
@@ -402,10 +437,14 @@ async def update_course_attendees(user_id: int, course_id: int, athlete_uuids: L
 async def update_session_status(user_id: int, session_id: int, new_status: str, db: AsyncSession) -> Session | None:
     subquery = select(Session.id).where(Session.id == session_id, Session.user_id == user_id).scalar_subquery()
 
+    values_to_update = {"status": new_status}
+    if new_status == "Complete":
+        values_to_update["completed_at"] = datetime.datetime.now(datetime.timezone.utc)
+
     await db.execute(
         update(Session)
         .where(Session.id == subquery)
-        .values(status=new_status)
+        .values(**values_to_update)
     )
     await db.commit()
 
@@ -460,7 +499,8 @@ async def save_task_completions(user_id: int, session_id: int, payload: SessionC
                 final_score=completion_data.score,
                 scores_breakdown=completion_data.scores,
                 notes=completion_data.notes,
-                time_seconds=completion_data.time
+                time_seconds=completion_data.time,
+                completed_at=datetime.datetime.now(datetime.timezone.utc)
             )
             db_completions.append(db_completion)
 
@@ -561,7 +601,7 @@ async def get_all_events(user_id: int, db: AsyncSession) -> List[EventItem]:
     query = (
         select(Session)
         .options(selectinload(Session.course))
-        .where(Session.user_id == user_id, Session.is_template == False)
+        .where(Session.user_id == user_id, Session.is_template == False, Session.status != "Pending")
         .order_by(Session.scheduled_date.desc())
     )
     result = await db.execute(query)

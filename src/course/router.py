@@ -17,7 +17,7 @@ from .service import (
     get_skills, create_skill, get_sessions, create_course, get_all_courses_with_details,
     get_course_details, update_course_attendees, create_session, get_courses, save_task_completions,
     update_session_status, get_session_report_data, upload_course_image, update_session, delete_session, update_course,
-    delete_course, get_all_events, update_course_archive_status, get_session_by_id
+    delete_course, get_all_events, update_course_archive_status, get_session_by_id, confirm_session
 )
 from ..upload.schemas import UploadResponse
 
@@ -83,7 +83,7 @@ async def update_existing_session(
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def remove_session_template(
+async def remove_session(
         session_id: int,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_async_session)
@@ -246,3 +246,11 @@ async def complete_session_and_save_scores(
 ):
     await save_task_completions(user_id=current_user.id, session_id=session_id, payload=payload, db=db)
     return {"message": "Session scores saved successfully."}
+
+@router.post("/session/{session_id}/confirm", response_model=SessionRead)
+async def confirm_a_quick_session(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session)
+):
+    return await confirm_session(user_id=current_user.id, session_id=session_id, db=db)

@@ -91,6 +91,7 @@ class SessionRead(BaseModel):
     name: str
     description: Optional[str]
     scheduled_date: datetime
+    completed_at: Optional[datetime] = None
     is_template: bool
     status: str
     tasks: List[SessionTaskRead]

@@ -3,7 +3,7 @@ import datetime
 import uuid
 
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, Index
 from sqlalchemy.orm import relationship
 from src.database import Base
 
@@ -41,7 +41,8 @@ class Session(Base):
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     scheduled_date = Column(DateTime(timezone=True), nullable=False)
-    status = Column(String, nullable=False, default="To Do")
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String, nullable=False, default="Pending")
     is_template = Column(Boolean, default=False)
     total_session_time_seconds = Column(Integer, nullable=True)
 
@@ -54,6 +55,10 @@ class Session(Base):
                          order_by="SessionTask.sequence")
     attendance_records = relationship("SessionAttendee", back_populates="session", cascade="all, delete-orphan")
     completions = relationship("TaskCompletion", back_populates="session", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index('ix_sessions_status_scheduled_date', 'status', 'scheduled_date'),
+    )
 
     @property
     def total_duration_minutes(self) -> int:
