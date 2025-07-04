@@ -208,6 +208,9 @@ class TestInternalHelpers:
         mock_image_instance = MagicMock()
         mock_image_instance.mode = "RGBA"
         mock_image_instance.size = (2000, 1500)
+
+        mock_image_instance.convert.return_value = mock_image_instance
+
         mock_pil_image.open.return_value = mock_image_instance
         config = image_upload_service.configs[ImageType.COURSE]
 

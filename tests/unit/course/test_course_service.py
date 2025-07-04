@@ -167,7 +167,7 @@ class TestSessionService:
         with pytest.raises(HTTPException) as exc_info:
             await delete_session(1, 99, mock_db_session)
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-        assert "Session template not found" in exc_info.value.detail
+        assert "Session not found or you do not have permission." in exc_info.value.detail
 
 
 # --- Test ID: UTC-26, UTC-27, UTC-28, UTC-29, UTC-30 ---

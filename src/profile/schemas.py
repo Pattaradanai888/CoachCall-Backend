@@ -1,6 +1,6 @@
 # src/profile/schemas.py
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class ProfileUpdate(BaseModel):
@@ -20,5 +20,4 @@ class ProfileResponse(BaseModel):
     fullname: str
     profile_image_url: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
