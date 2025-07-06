@@ -86,7 +86,7 @@ class SessionTask(Base):
     sequence = Column(Integer, nullable=False)
 
     session = relationship("Session", back_populates="tasks")
-    task = relationship("Task")
+    task = relationship("Task", cascade="all, delete-orphan", single_parent=True)
 
 
 class TaskSkillWeight(Base):

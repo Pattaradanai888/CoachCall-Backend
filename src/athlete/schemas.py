@@ -36,7 +36,6 @@ class AthleteSkillResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-
 class AthleteBase(BaseModel):
     name: str
     preferred_name: Optional[str] = None
@@ -55,7 +54,6 @@ class AthleteBase(BaseModel):
     experience_level_id: Optional[int] = None
     group_ids: Optional[List[int]] = []
     position_ids: Optional[List[int]] = []
-
 
 
 class AthleteCreate(AthleteBase):
@@ -123,35 +121,15 @@ class GroupDeleteResponse(BaseModel):
     message: str
     deleted_group_id: int
 
+
 class PositionCreate(BaseModel):
     name: str
+
 
 class PositionDeleteResponse(BaseModel):
     message: str
     deleted_position_id: int
 
-
-class TrendDataPoint(BaseModel):
-    date: str
-    day_name: str
-    formatted_date: str
-    count: int
-
-class AthleteInsights(BaseModel):
-    week_change_percent: Optional[float]
-    peak_day: Optional[str]
-    avg_daily: float
-    is_growing: Optional[bool]
-
-
-class AthleteCreationStat(BaseModel):
-    today: int
-    week: int
-    month: int
-    total: int
-    trend: list[int]
-    trend_detailed: List[TrendDataPoint]
-    insights: AthleteInsights
 
 class AthleteSelectionResponse(BaseModel):
     uuid: UUID

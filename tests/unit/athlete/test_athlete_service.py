@@ -8,6 +8,7 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
+from src.analytics.service import get_athlete_stats
 from src.athlete.models import Athlete, Group, Position, ExperienceLevel
 from src.athlete.schemas import AthleteCreate, AthleteUpdate
 from src.athlete.service import (
@@ -18,7 +19,6 @@ from src.athlete.service import (
     delete_position,
     upload_athlete_image,
     delete_athlete_image,
-    get_athlete_stats,
     get_coach_athletes,
     get_coach_athlete_by_uuid,
     create_group,

@@ -1,11 +1,12 @@
 # src/athlete/service.py
 import uuid as _uuid
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 import pytz
 from typing import Sequence, Optional
 
 from fastapi import HTTPException, status, UploadFile
-from sqlalchemy import func, select, desc, update
+from sqlalchemy import func, select, desc, update, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -45,7 +46,6 @@ async def create_athlete(user_id: int, athlete: AthleteCreate, db: AsyncSession)
     db.add(db_athlete)
     await db.commit()
 
-    # Eagerly load all relationships needed for the response to prevent MissingGreenlet error
     await db.refresh(
         db_athlete,
         attribute_names=[
@@ -55,8 +55,6 @@ async def create_athlete(user_id: int, athlete: AthleteCreate, db: AsyncSession)
             'skill_levels'
         ]
     )
-    # The related skill objects for skill_levels might also need to be loaded
-    # if they are accessed in the response model. Let's load them explicitly.
     result = await db.execute(
         select(Athlete).where(Athlete.id == db_athlete.id).options(
             selectinload(Athlete.groups),
@@ -78,6 +76,7 @@ async def get_coach_athletes(user_id: int, db: AsyncSession, skip: int = 0, limi
         .options(selectinload(Athlete.groups), selectinload(Athlete.positions))
     )
     return result.scalars().all()
+
 
 async def get_all_coach_athletes_for_selection(user_id: int, db: AsyncSession) -> Sequence[Athlete]:
     result = await db.execute(
@@ -116,7 +115,6 @@ async def update_athlete(user_id: int, athlete_uuid: _uuid.UUID, athlete: Athlet
 
     # Get data for simple fields, excluding M2M relationships
     update_data = athlete.model_dump(exclude_unset=True, exclude={'group_ids', 'position_ids'})
-
 
     # Update simple attributes
     for key, value in update_data.items():
@@ -227,130 +225,6 @@ async def delete_position(position_id: int, user_id: int, db: AsyncSession):
     await db.delete(db_position)
     await db.commit()
     return {"message": "Position deleted successfully", "deleted_position_id": position_id}
-
-
-async def get_athlete_stats(user_id: int, db: AsyncSession):
-    now_utc = datetime.now(timezone.utc)
-    today_utc = now_utc.date()
-
-    # Time periods
-    seven_days_ago = today_utc - timedelta(days=7)
-    month_ago = today_utc - timedelta(days=30)
-    six_days_ago = today_utc - timedelta(days=6)
-
-    # Convert to datetime for comparison
-    today_start = datetime.combine(today_utc, datetime.min.time(), tzinfo=timezone.utc)
-    seven_days_ago_start = datetime.combine(seven_days_ago, datetime.min.time(), tzinfo=timezone.utc)
-    six_days_ago_start = datetime.combine(six_days_ago, datetime.min.time(), tzinfo=timezone.utc)
-    month_start = datetime.combine(month_ago, datetime.min.time(), tzinfo=timezone.utc)
-
-    # Basic counts
-    today_count = await db.scalar(
-        select(func.count(Athlete.id)).where(
-            Athlete.user_id == user_id,
-            Athlete.created_at >= today_start
-        )
-    )
-
-    week_count = await db.scalar(
-        select(func.count(Athlete.id)).where(
-            Athlete.user_id == user_id,
-            Athlete.created_at >= seven_days_ago_start
-        )
-    )
-
-    month_count = await db.scalar(
-        select(func.count(Athlete.id)).where(
-            Athlete.user_id == user_id,
-            Athlete.created_at >= month_start
-        )
-    )
-
-    # Total athletes
-    total_athletes = await db.scalar(
-        select(func.count(Athlete.id)).where(Athlete.user_id == user_id)
-    )
-
-    # Get daily counts for the past 7 days
-    daily_counts_query = select(
-        func.date(Athlete.created_at).label('date'),
-        func.count(Athlete.id).label('count')
-    ).where(
-        Athlete.user_id == user_id,
-        Athlete.created_at >= six_days_ago_start
-    ).group_by(func.date(Athlete.created_at)).order_by(func.date(Athlete.created_at))
-
-    daily_counts_result = await db.execute(daily_counts_query)
-    daily_counts = daily_counts_result.all()
-
-    # Create detailed trend data
-    daily_counts_dict = {row.date: row.count for row in daily_counts}
-    dates = [six_days_ago + timedelta(days=i) for i in range(7)]
-
-    # Enhanced trend data with dates and day names
-    trend_data = []
-    for date in dates:
-        count = daily_counts_dict.get(date, 0)
-        trend_data.append({
-            "date": date.isoformat(),
-            "day_name": date.strftime("%a"),  # Mon, Tue, etc.
-            "formatted_date": date.strftime("%m/%d"),  # 12/25
-            "count": count
-        })
-
-    # Calculate percentage changes for insights
-    prev_week_start = seven_days_ago - timedelta(days=7)
-    prev_week_start_dt = datetime.combine(prev_week_start, datetime.min.time())
-
-    prev_week_count = await db.scalar(
-        select(func.count(Athlete.id)).where(
-            Athlete.user_id == user_id,
-            Athlete.created_at >= prev_week_start_dt,
-            Athlete.created_at < seven_days_ago_start
-        )
-    )
-
-    # Calculate week-over-week change - handle None values properly
-    week_change = None
-    is_growing = None
-    if prev_week_count is not None and prev_week_count > 0:
-        week_change = round(((week_count - prev_week_count) / prev_week_count) * 100, 1)
-        is_growing = week_change > 0
-    elif prev_week_count == 0 and week_count > 0:
-        # If previous week had 0 and current week has some, it's growing
-        is_growing = True
-        week_change = 100.0  # or you could set this to None if you prefer
-
-    # Find peak day in current week
-    peak_day = None
-    max_count = 0
-    for item in trend_data:
-        if item["count"] > max_count:
-            max_count = item["count"]
-            peak_day = item["day_name"]
-
-    # Only set peak_day if there's actual data
-    if max_count == 0:
-        peak_day = None
-
-    # Calculate average daily additions
-    avg_daily = round(week_count / 7, 1) if week_count > 0 else 0.0
-
-    stats = {
-        "today": today_count or 0,
-        "week": week_count or 0,
-        "month": month_count or 0,
-        "total": total_athletes or 0,
-        "trend": [item["count"] for item in trend_data],
-        "trend_detailed": trend_data,
-        "insights": {
-            "week_change_percent": week_change,  # Can be None
-            "peak_day": peak_day,  # Can be None
-            "avg_daily": avg_daily,  # Always float
-            "is_growing": is_growing  # Can be None
-        }
-    }
-    return stats
 
 
 async def upload_athlete_image(

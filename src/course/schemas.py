@@ -1,11 +1,13 @@
 # src/course/schemas.py
 
 from datetime import date, datetime
-from typing import List, Optional, Dict, Literal
-from pydantic import BaseModel, HttpUrl, Field, ConfigDict, computed_field
 from decimal import Decimal
+from typing import List, Optional, Dict, Literal
 from uuid import UUID
 
+from pydantic import BaseModel, HttpUrl, Field, ConfigDict, computed_field
+
+from src.analytics.schemas import SkillScore
 from src.athlete.schemas import PositionResponse
 
 
@@ -69,6 +71,7 @@ class TaskRead(BaseModel):
     skill_weights: List[TaskSkillWeightRead]
     model_config = ConfigDict(from_attributes=True)
 
+
 class SessionTaskRead(BaseModel):
     sequence: int
     task: TaskRead
@@ -85,6 +88,7 @@ class TaskCompletionRead(BaseModel):
     time_seconds: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class SessionRead(BaseModel):
     id: int
@@ -103,6 +107,7 @@ class SessionRead(BaseModel):
     @property
     def task_count(self) -> int:
         return len(self.tasks)
+
 
 class SessionTemplateRead(BaseModel):
     id: int
@@ -153,19 +158,39 @@ class CourseListRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class FinalEvaluationData(BaseModel):
     scores: Dict[str, float]
     notes: Optional[str]
     time: int
 
+
+class SessionSkillComparison(BaseModel):
+    before: List[SkillScore]
+    after: List[SkillScore]
+
+class CourseContextForReport(BaseModel):
+    id: int
+    name: str
+    description: Optional[str]
+    cover_image_url: Optional[str]
+    is_archived: bool
+    start_date: datetime
+    end_date: datetime
+    attendees: List[AttendeeResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
 class SessionReportData(BaseModel):
-    course: Optional[CourseRead] = None
+    course: Optional[CourseContextForReport] = None
     session: SessionRead
+    skill_comparison_data: Dict[str, SessionSkillComparison] = Field(..., alias="skillComparisonData")
     participatingAthletes: List[AttendeeResponse] = Field(..., alias="participatingAthletes")
     evaluations: Dict[str, FinalEvaluationData]
     totalSessionTime: int = Field(..., alias="totalSessionTime")
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
 
 class TaskCompletionCreate(BaseModel):
     athlete_uuid: UUID
@@ -176,9 +201,11 @@ class TaskCompletionCreate(BaseModel):
     notes: Optional[str] = None
     time: int
 
+
 class SessionCompletionPayload(BaseModel):
     completions: List[TaskCompletionCreate]
     totalSessionTime: int
+
 
 class EventItem(BaseModel):
     id: int
@@ -191,8 +218,10 @@ class EventItem(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class SessionStatusUpdate(BaseModel):
     status: str
+
 
 class CourseArchiveStatusUpdate(BaseModel):
     is_archived: bool

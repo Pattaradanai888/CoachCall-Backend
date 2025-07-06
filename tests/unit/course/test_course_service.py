@@ -188,14 +188,15 @@ class TestCourseService:
             }]
         )
 
-    async def test_create_course_success(self, mock_db_session, course_create_payload):
+    @patch("src.course.service.get_course_details", new_callable=AsyncMock)
+    async def test_create_course_success(self, mock_get_details, mock_db_session, course_create_payload):
         """UTC-26-TC-01: Success: Create a course with valid sessions and attendees."""
-        mock_athletes = MagicMock()
-        mock_athletes.scalars.return_value.all.return_value = [Athlete(uuid=course_create_payload.attendee_ids[0])]
-        mock_final_course = MagicMock()
-        mock_final_course.scalars.return_value.unique.return_value.one.return_value = Course(id=1)
-        mock_db_session.execute.side_effect = [mock_athletes, mock_final_course]
-
+        mock_athletes_result = MagicMock()
+        mock_athletes_result.scalars.return_value.all.return_value = [
+            Athlete(uuid=course_create_payload.attendee_ids[0])
+        ]
+        mock_db_session.execute.return_value = mock_athletes_result
+        mock_get_details.return_value = Course(id=1)
         new_course = await create_course(1, course_create_payload, mock_db_session)
 
         assert isinstance(new_course, Course)
@@ -295,7 +296,6 @@ class TestCompletionAndReportService:
             totalSessionTime=1200
         )
         mock_session = Session(id=1, user_id=1)
-        mock_athlete_map = {str(payload.completions[0].athlete_uuid): 5}
 
         mock_session_result = MagicMock()
         mock_session_result.scalars.return_value.one_or_none.return_value = mock_session
@@ -304,12 +304,20 @@ class TestCompletionAndReportService:
         mock_athlete_result.scalars.return_value.all.return_value = [
             Athlete(id=5, uuid=payload.completions[0].athlete_uuid)]
 
-        mock_db_session.execute.side_effect = [mock_session_result, mock_athlete_result]
+        mock_completions_result = MagicMock()
+        mock_completions_result.scalars.return_value.unique.return_value.all.return_value = []
+
+        mock_db_session.execute.side_effect = [
+            mock_session_result,
+            mock_athlete_result,
+            mock_completions_result
+        ]
 
         await save_task_completions(1, 1, payload, mock_db_session)
 
         assert mock_session.total_session_time_seconds == 1200
         mock_db_session.add_all.assert_called_once()
+        mock_db_session.flush.assert_awaited_once()
         mock_db_session.commit.assert_awaited_once()
 
     async def test_get_session_report_data_success(self, mock_db_session):

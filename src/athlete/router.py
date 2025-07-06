@@ -9,7 +9,7 @@ from src.database import get_async_session
 from . import service
 from .schemas import (
     AthleteCreate, AthleteResponse, AthleteListResponse, AthleteUpdate, GroupResponse,
-    AthleteCreationStat, GroupDeleteResponse, GroupCreate, PositionResponse, PositionCreate, PositionDeleteResponse,
+    GroupDeleteResponse, GroupCreate, PositionResponse, PositionCreate, PositionDeleteResponse,
     AthleteSelectionResponse
 )
 from .service import (
@@ -17,15 +17,18 @@ from .service import (
     delete_athlete, create_group, get_groups, delete_group, create_position, get_positions, delete_position,
     delete_athlete_image, upload_athlete_image, get_all_coach_athletes_for_selection
 )
+from ..analytics.schemas import AthleteSkillProgression
 from ..auth.dependencies import get_current_user
 from ..auth.models import User
-from ..upload.schemas import UploadResponse
+from ..course.service import update_athlete_skill_scores
+from ..analytics.service import get_athlete_skill_progression
 
 router = APIRouter()
 
 
 @router.post("/groups", response_model=GroupResponse)
-async def create_new_group(group_data: GroupCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def create_new_group(group_data: GroupCreate, current_user: User = Depends(get_current_user),
+                           db: AsyncSession = Depends(get_async_session)):
     return await create_group(current_user.id, group_data.name, db)
 
 
@@ -35,12 +38,14 @@ async def list_groups(current_user: User = Depends(get_current_user), db: AsyncS
 
 
 @router.delete("/groups/{group_id}", response_model=GroupDeleteResponse)
-async def remove_group(group_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def remove_group(group_id: int, current_user: User = Depends(get_current_user),
+                       db: AsyncSession = Depends(get_async_session)):
     return await delete_group(group_id, current_user.id, db)
 
 
 @router.post("/positions", response_model=PositionResponse)
-async def create_new_position(position_data: PositionCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def create_new_position(position_data: PositionCreate, current_user: User = Depends(get_current_user),
+                              db: AsyncSession = Depends(get_async_session)):
     return await create_position(current_user.id, position_data.name, db)
 
 
@@ -50,13 +55,9 @@ async def list_positions(current_user: User = Depends(get_current_user), db: Asy
 
 
 @router.delete("/positions/{position_id}", response_model=PositionDeleteResponse)
-async def remove_position(position_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def remove_position(position_id: int, current_user: User = Depends(get_current_user),
+                          db: AsyncSession = Depends(get_async_session)):
     return await delete_position(position_id, current_user.id, db)
-
-
-@router.get("/stats", response_model=AthleteCreationStat)
-async def get_athlete_creation_stats(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
-    return await service.get_athlete_stats(current_user.id, db)
 
 
 @router.get("/latest", response_model=Optional[AthleteListResponse])
@@ -77,8 +78,10 @@ async def get_latest_athlete(current_user: User = Depends(get_current_user),
         profile_image_url=latest_athlete.profile_image_url
     )
 
+
 @router.get("/all", response_model=List[AthleteSelectionResponse])
-async def list_all_athletes_for_selection(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def list_all_athletes_for_selection(current_user: User = Depends(get_current_user),
+                                          db: AsyncSession = Depends(get_async_session)):
     """Provides a lightweight list of all athletes for selection UI elements."""
     athletes = await get_all_coach_athletes_for_selection(current_user.id, db)
     return athletes
@@ -106,21 +109,49 @@ async def list_athletes(skip: int = 0, limit: int = 5, current_user: User = Depe
 
 
 @router.post("", response_model=AthleteResponse)
-async def create_new_athlete(athlete: AthleteCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def create_new_athlete(athlete: AthleteCreate, current_user: User = Depends(get_current_user),
+                             db: AsyncSession = Depends(get_async_session)):
     return await create_athlete(current_user.id, athlete, db)
 
 
-
 @router.get("/{athlete_uuid}", response_model=AthleteResponse)
-async def get_athlete(athlete_uuid: UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def get_athlete(athlete_uuid: UUID, current_user: User = Depends(get_current_user),
+                      db: AsyncSession = Depends(get_async_session)):
     athlete = await get_coach_athlete_by_uuid(current_user.id, athlete_uuid, db)
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
     return athlete
 
 
+@router.get("/{athlete_uuid}/skill-progression", response_model=AthleteSkillProgression)
+async def get_athlete_skills_data(
+        athlete_uuid: UUID,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    return await get_athlete_skill_progression(user_id=current_user.id, athlete_uuid=athlete_uuid, db=db)
+
+
+@router.post("/{athlete_uuid}/recalculate-skills", response_model=AthleteSkillProgression)
+async def recalculate_athlete_skills(
+        athlete_uuid: UUID,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_async_session)
+):
+    athlete = await get_coach_athlete_by_uuid(current_user.id, athlete_uuid, db)
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+
+    await update_athlete_skill_scores(athlete.id, db)
+    await db.commit()
+
+    return await get_athlete_skill_progression(user_id=current_user.id, athlete_uuid=athlete_uuid, db=db)
+
+
 @router.put("/{athlete_uuid}", response_model=AthleteResponse)
-async def update_athlete_info(athlete_uuid: UUID, athlete_update: AthleteUpdate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def update_athlete_info(athlete_uuid: UUID, athlete_update: AthleteUpdate,
+                              current_user: User = Depends(get_current_user),
+                              db: AsyncSession = Depends(get_async_session)):
     updated = await update_athlete(current_user.id, athlete_uuid, athlete_update, db)
     if not updated:
         raise HTTPException(status_code=404, detail="Athlete not found")
@@ -128,7 +159,8 @@ async def update_athlete_info(athlete_uuid: UUID, athlete_update: AthleteUpdate,
 
 
 @router.delete("/{athlete_uuid}")
-async def delete_athlete_profile(athlete_uuid: UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def delete_athlete_profile(athlete_uuid: UUID, current_user: User = Depends(get_current_user),
+                                 db: AsyncSession = Depends(get_async_session)):
     success = await delete_athlete(current_user.id, athlete_uuid, db)
     if not success:
         raise HTTPException(status_code=404, detail="Athlete not found")
@@ -136,12 +168,15 @@ async def delete_athlete_profile(athlete_uuid: UUID, current_user: User = Depend
 
 
 @router.post("/{athlete_uuid}/upload-image")
-async def upload_athlete_profile_image(athlete_uuid: UUID, file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def upload_athlete_profile_image(athlete_uuid: UUID, file: UploadFile = File(...),
+                                       current_user: User = Depends(get_current_user),
+                                       db: AsyncSession = Depends(get_async_session)):
     image_url = await upload_athlete_image(current_user.id, athlete_uuid, file, db)
     return {"message": "Athlete profile image uploaded successfully", "image_url": image_url}
 
 
 @router.delete("/{athlete_uuid}/image")
-async def delete_athlete_profile_image(athlete_uuid: UUID, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_async_session)):
+async def delete_athlete_profile_image(athlete_uuid: UUID, current_user: User = Depends(get_current_user),
+                                       db: AsyncSession = Depends(get_async_session)):
     await delete_athlete_image(current_user.id, athlete_uuid, db)
     return {"message": "Athlete profile image deleted successfully"}
