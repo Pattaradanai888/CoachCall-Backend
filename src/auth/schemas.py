@@ -1,7 +1,9 @@
 # src/auth/schemas.py
-from typing import Optional
 
-from pydantic import BaseModel, EmailStr, ConfigDict, Field
+
+from pydantic import BaseModel, ConfigDict, EmailStr
+
+from src.auth.config import auth_settings
 
 
 class UserCreate(BaseModel):
@@ -12,17 +14,18 @@ class UserCreate(BaseModel):
 
 class Token(BaseModel):
     access_token: str
-    refresh_token: Optional[str] = None
-    token_type: str = "bearer"
+    refresh_token: str | None = None
+    token_type: str = auth_settings.TOKEN_TYPE
 
 
 class UserProfileRead(BaseModel):
     display_name: str
-    profile_image_url: Optional[str] = None
+    profile_image_url: str | None = None
+
 
 class UserRead(BaseModel):
     id: int
     email: str
-    profile: Optional[UserProfileRead] = None
+    profile: UserProfileRead | None = None
 
     model_config = ConfigDict(from_attributes=True)

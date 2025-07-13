@@ -3,26 +3,43 @@ import enum
 import uuid
 
 from sqlalchemy import (
-    Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric,
-    Enum as SQLAlchemyEnum, Table, func, Date
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Table,
+    func,
 )
-from sqlalchemy.dialects.postgresql import UUID as PostgresUUID
+from sqlalchemy import (
+    Enum as SQLAlchemyEnum,
+)
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from src.database import Base
 
-athlete_group_association = Table('athlete_group_association', Base.metadata,
-                                  Column('athlete_id', Integer, ForeignKey('athletes.id'), primary_key=True),
-                                  Column('group_id', Integer, ForeignKey('groups.id'), primary_key=True)
-                                  )
-athlete_position_association = Table('athlete_position_association', Base.metadata,
-                                     Column('athlete_id', Integer, ForeignKey('athletes.id'), primary_key=True),
-                                     Column('position_id', Integer, ForeignKey('positions.id'), primary_key=True)
-                                     )
-course_attendees = Table('course_attendees', Base.metadata,
-                         Column('course_id', Integer, ForeignKey('courses.id'), primary_key=True),
-                         Column('athlete_id', Integer, ForeignKey('athletes.id'), primary_key=True)
-                         )
+athlete_group_association = Table(
+    "athlete_group_association",
+    Base.metadata,
+    Column("athlete_id", Integer, ForeignKey("athletes.id"), primary_key=True),
+    Column("group_id", Integer, ForeignKey("groups.id"), primary_key=True),
+)
+athlete_position_association = Table(
+    "athlete_position_association",
+    Base.metadata,
+    Column("athlete_id", Integer, ForeignKey("athletes.id"), primary_key=True),
+    Column("position_id", Integer, ForeignKey("positions.id"), primary_key=True),
+)
+course_attendees = Table(
+    "course_attendees",
+    Base.metadata,
+    Column("course_id", Integer, ForeignKey("courses.id"), primary_key=True),
+    Column("athlete_id", Integer, ForeignKey("athletes.id"), primary_key=True),
+)
 
 
 class DominantHandEnum(str, enum.Enum):
@@ -39,7 +56,13 @@ class Athlete(Base):
     __tablename__ = "athletes"
     id = Column(Integer, primary_key=True)
 
-    uuid = Column(PostgresUUID(as_uuid=True), default=uuid.uuid4, unique=True, index=True, nullable=False)
+    uuid = Column(
+        UUID(as_uuid=True),
+        default=uuid.uuid4,
+        unique=True,
+        index=True,
+        nullable=False,
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     is_active = Column(Boolean, default=True)
 
@@ -60,22 +83,41 @@ class Athlete(Base):
     notes = Column(String(1000))
 
     # Foreign keys
-    experience_level_id = Column(Integer, ForeignKey("experience_levels.id"), nullable=True)
+    experience_level_id = Column(
+        Integer, ForeignKey("experience_levels.id"), nullable=True
+    )
 
     # Timestamps last
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
     user = relationship("User", back_populates="athletes")
 
     experience_level = relationship("ExperienceLevel", back_populates="athletes")
 
-    groups = relationship("Group", secondary=athlete_group_association, back_populates="athletes")
-    positions = relationship("Position", secondary=athlete_position_association, back_populates="athletes")
-    courses = relationship("Course", secondary=course_attendees, back_populates="attendees")
+    groups = relationship(
+        "Group", secondary=athlete_group_association, back_populates="athletes"
+    )
+    positions = relationship(
+        "Position", secondary=athlete_position_association, back_populates="athletes"
+    )
+    courses = relationship(
+        "Course", secondary=course_attendees, back_populates="attendees"
+    )
 
-    skill_levels = relationship("AthleteSkill", back_populates="athlete", cascade="all, delete-orphan")
-    task_completions = relationship("TaskCompletion", back_populates="athlete", cascade="all, delete-orphan")
+    skill_levels = relationship(
+        "AthleteSkill", back_populates="athlete", cascade="all, delete-orphan"
+    )
+    task_completions = relationship(
+        "TaskCompletion", back_populates="athlete", cascade="all, delete-orphan"
+    )
 
 
 class Position(Base):
@@ -84,7 +126,9 @@ class Position(Base):
     name = Column(String(50), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User", back_populates="positions")
-    athletes = relationship("Athlete", secondary=athlete_position_association, back_populates="positions")
+    athletes = relationship(
+        "Athlete", secondary=athlete_position_association, back_populates="positions"
+    )
 
 
 class ExperienceLevel(Base):
@@ -103,7 +147,9 @@ class Group(Base):
     name = Column(String(100), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User", back_populates="groups")
-    athletes = relationship("Athlete", secondary=athlete_group_association, back_populates="groups")
+    athletes = relationship(
+        "Athlete", secondary=athlete_group_association, back_populates="groups"
+    )
 
 
 class AthleteSkill(Base):

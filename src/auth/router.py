@@ -1,15 +1,13 @@
 # src/auth/router.py
-from typing import Any, Coroutine, Optional
 
-from fastapi import APIRouter, Depends, Response, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.responses import JSONResponse
 
-from src.auth.models import User
-from src.auth.schemas import UserCreate, Token, UserRead
-from src.auth.service import register_user, login_user, refresh_tokens, logout_user as service_logout, logout_user
 from src.auth.dependencies import get_current_user, get_optional_current_user
+from src.auth.models import User
+from src.auth.schemas import Token, UserCreate, UserRead
+from src.auth.service import login_user, logout_user, refresh_tokens, register_user
 from src.database import get_async_session
 
 router = APIRouter()
@@ -19,20 +17,23 @@ COOKIE_SETTINGS = {
     "path": "/",
     "httponly": True,
     "secure": False,  # Set to True in deployment
-    "samesite": "lax"
+    "samesite": "lax",
 }
 
 
 @router.post("/token", response_model=Token)
-async def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(),
-                db: AsyncSession = Depends(get_async_session)):
+async def login(
+    response: Response,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_async_session),
+):
     token = await login_user(form_data.username, form_data.password, db)
 
     # Set refresh token cookie with consistent settings
     response.set_cookie(
         value=token.refresh_token,
         max_age=7 * 24 * 3600,  # 7 days in seconds
-        **COOKIE_SETTINGS
+        **COOKIE_SETTINGS,
     )
 
     return token
@@ -49,7 +50,7 @@ async def refresh(request: Request, response: Response):
     response.set_cookie(
         value=token.refresh_token,
         max_age=7 * 24 * 3600,  # 7 days in seconds
-        **COOKIE_SETTINGS
+        **COOKIE_SETTINGS,
     )
 
     return token
@@ -74,9 +75,12 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_async_sessio
 async def get_me(current_user=Depends(get_current_user)):
     return current_user
 
+
 @router.get("/verify")
-async def verify_token(current_user: Optional[User] = Depends(get_optional_current_user)):
+async def verify_token(
+    current_user: User | None = Depends(get_optional_current_user),
+):
     return {
         "valid": current_user is not None,
-        "user_id": current_user.id if current_user else None
+        "user_id": current_user.id if current_user else None,
     }

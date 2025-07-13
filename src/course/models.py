@@ -1,10 +1,19 @@
 # src/course/models.py
-import datetime
 import uuid
 
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+)
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, Index
 from sqlalchemy.orm import relationship
+
 from src.database import Base
 
 
@@ -31,8 +40,12 @@ class Course(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User", back_populates="courses")
 
-    sessions = relationship("Session", back_populates="course", cascade="all, delete-orphan")
-    attendees = relationship("Athlete", secondary='course_attendees', back_populates="courses")
+    sessions = relationship(
+        "Session", back_populates="course", cascade="all, delete-orphan"
+    )
+    attendees = relationship(
+        "Athlete", secondary="course_attendees", back_populates="courses"
+    )
 
 
 class Session(Base):
@@ -46,25 +59,39 @@ class Session(Base):
     is_template = Column(Boolean, default=False)
     total_session_time_seconds = Column(Integer, nullable=True)
 
-    course_id = Column(Integer, ForeignKey("courses.id", ondelete="SET NULL"), nullable=True)
+    course_id = Column(
+        Integer, ForeignKey("courses.id", ondelete="SET NULL"), nullable=True
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     course = relationship("Course", back_populates="sessions")
     user = relationship("User", back_populates="sessions")
-    tasks = relationship("SessionTask", back_populates="session", cascade="all, delete-orphan",
-                         order_by="SessionTask.sequence")
-    attendance_records = relationship("SessionAttendee", back_populates="session", cascade="all, delete-orphan")
-    completions = relationship("TaskCompletion", back_populates="session", cascade="all, delete-orphan")
+    tasks = relationship(
+        "SessionTask",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="SessionTask.sequence",
+    )
+    attendance_records = relationship(
+        "SessionAttendee", back_populates="session", cascade="all, delete-orphan"
+    )
+    completions = relationship(
+        "TaskCompletion", back_populates="session", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
-        Index('ix_sessions_status_scheduled_date', 'status', 'scheduled_date'),
+        Index("ix_sessions_status_scheduled_date", "status", "scheduled_date"),
     )
 
     @property
     def total_duration_minutes(self) -> int:
         if not self.tasks:
             return 0
-        return sum(st.task.duration_minutes for st in self.tasks if st.task and st.task.duration_minutes)
+        return sum(
+            st.task.duration_minutes
+            for st in self.tasks
+            if st.task and st.task.duration_minutes
+        )
 
 
 class Task(Base):
@@ -76,7 +103,9 @@ class Task(Base):
 
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user = relationship("User", back_populates="tasks")
-    skill_weights = relationship("TaskSkillWeight", back_populates="task", cascade="all, delete-orphan")
+    skill_weights = relationship(
+        "TaskSkillWeight", back_populates="task", cascade="all, delete-orphan"
+    )
 
 
 class SessionTask(Base):

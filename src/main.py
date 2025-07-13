@@ -1,15 +1,13 @@
 # src/main.py
 
 from src.auth import models as auth_models  # noqa
-from src.athlete import models as athlete_models # noqa
-from src.course import models as course_models # noqa
+from src.athlete import models as athlete_models  # noqa
+from src.course import models as course_models  # noqa
 
-import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config import settings
 from src.api import api_router
-
 
 
 app = FastAPI(title=settings.PROJECT_NAME)
@@ -27,6 +25,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.get("/")
 async def read_root():

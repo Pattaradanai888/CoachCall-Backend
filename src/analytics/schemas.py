@@ -1,5 +1,5 @@
 # src/analytics/schemas.py
-from typing import Optional, List
+
 from pydantic import BaseModel
 
 
@@ -11,10 +11,10 @@ class TrendDataPoint(BaseModel):
 
 
 class AthleteInsights(BaseModel):
-    week_change_percent: Optional[float]
-    peak_day: Optional[str]
+    week_change_percent: float | None
+    peak_day: str | None
     avg_daily: float
-    is_growing: Optional[bool]
+    is_growing: bool | None
 
 
 class AthleteCreationStat(BaseModel):
@@ -23,7 +23,7 @@ class AthleteCreationStat(BaseModel):
     month: int
     total: int
     trend: list[int]
-    trend_detailed: List[TrendDataPoint]
+    trend_detailed: list[TrendDataPoint]
     insights: AthleteInsights
 
 
@@ -34,5 +34,5 @@ class SkillScore(BaseModel):
 
 
 class AthleteSkillProgression(BaseModel):
-    day_one: List[SkillScore]
-    current: List[SkillScore]
+    day_one: list[SkillScore]
+    current: list[SkillScore]

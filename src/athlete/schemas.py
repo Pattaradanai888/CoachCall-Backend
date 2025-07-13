@@ -1,10 +1,9 @@
 # src/athlete/schemas.py
 from datetime import date
 from decimal import Decimal
-from typing import Optional, List
 from uuid import UUID
 
-from pydantic import BaseModel, model_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class GroupResponse(BaseModel):
@@ -31,72 +30,74 @@ class ExperienceLevelResponse(BaseModel):
 class AthleteSkillResponse(BaseModel):
     skill_id: int
     current_score: Decimal
-    skill_name: Optional[str] = None
+    skill_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class AthleteBase(BaseModel):
     name: str
-    preferred_name: Optional[str] = None
-    age: Optional[int] = None  # Will be calculated
-    height: Optional[int] = None
-    weight: Optional[int] = None
-    dominant_hand: Optional[str] = None
+    preferred_name: str | None = None
+    age: int | None = None  # Will be calculated
+    height: int | None = None
+    weight: int | None = None
+    dominant_hand: str | None = None
     date_of_birth: date
-    phone_number: Optional[str] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_phone: Optional[str] = None
-    notes: Optional[str] = None
-    jersey_number: Optional[int] = None
+    phone_number: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    notes: str | None = None
+    jersey_number: int | None = None
 
     # Foreign Keys and M2M IDs for creation/update
-    experience_level_id: Optional[int] = None
-    group_ids: Optional[List[int]] = []
-    position_ids: Optional[List[int]] = []
+    experience_level_id: int | None = None
+    group_ids: list[int] | None = []
+    position_ids: list[int] | None = []
 
 
 class AthleteCreate(AthleteBase):
-    @model_validator(mode='before')
+    @model_validator(mode="before")
     def calculate_age(cls, values):
-        if 'date_of_birth' in values and values['date_of_birth']:
+        if "date_of_birth" in values and values["date_of_birth"]:
             today = date.today()
-            birth_date = values['date_of_birth']
+            birth_date = values["date_of_birth"]
             if isinstance(birth_date, str):
                 birth_date = date.fromisoformat(birth_date)
 
-            values['age'] = (today.year
-                             - birth_date.year
-                             - ((today.month, today.day) < (birth_date.month, birth_date.day)))
+            values["age"] = (
+                today.year
+                - birth_date.year
+                - ((today.month, today.day) < (birth_date.month, birth_date.day))
+            )
         return values
 
 
 class AthleteUpdate(BaseModel):
-    name: Optional[str] = None
-    preferred_name: Optional[str] = None
-    height: Optional[int] = None
-    weight: Optional[int] = None
-    dominant_hand: Optional[str] = None
-    date_of_birth: Optional[date] = None
-    phone_number: Optional[str] = None
-    emergency_contact_name: Optional[str] = None
-    emergency_contact_phone: Optional[str] = None
-    notes: Optional[str] = None
-    jersey_number: Optional[int] = None
-    experience_level_id: Optional[int] = None
-    group_ids: Optional[List[int]] = None
-    position_ids: Optional[List[int]] = None
+    name: str | None = None
+    preferred_name: str | None = None
+    height: int | None = None
+    weight: int | None = None
+    dominant_hand: str | None = None
+    date_of_birth: date | None = None
+    phone_number: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
+    notes: str | None = None
+    jersey_number: int | None = None
+    experience_level_id: int | None = None
+    group_ids: list[int] | None = None
+    position_ids: list[int] | None = None
 
 
 class AthleteResponse(AthleteBase):
     uuid: UUID
-    profile_image_url: Optional[str] = None
+    profile_image_url: str | None = None
     user_id: int
 
-    experience_level: Optional[ExperienceLevelResponse] = None
-    groups: List[GroupResponse] = []
-    positions: List[PositionResponse] = []
-    skill_levels: List[AthleteSkillResponse] = []
+    experience_level: ExperienceLevelResponse | None = None
+    groups: list[GroupResponse] = []
+    positions: list[PositionResponse] = []
+    skill_levels: list[AthleteSkillResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -104,17 +105,17 @@ class AthleteResponse(AthleteBase):
 class AthleteListResponse(BaseModel):
     uuid: UUID
     name: str
-    age: Optional[int]
-    preferred_name: Optional[str]
+    age: int | None
+    preferred_name: str | None
     position: str
-    profile_image_url: Optional[str]
+    profile_image_url: str | None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class GroupCreate(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class GroupDeleteResponse(BaseModel):
@@ -134,9 +135,9 @@ class PositionDeleteResponse(BaseModel):
 class AthleteSelectionResponse(BaseModel):
     uuid: UUID
     name: str
-    profile_image_url: Optional[str] = None
-    positions: List[PositionResponse] = []
-    age: Optional[int] = None
-    groups: List[GroupResponse] = []
+    profile_image_url: str | None = None
+    positions: list[PositionResponse] = []
+    age: int | None = None
+    groups: list[GroupResponse] = []
 
     model_config = ConfigDict(from_attributes=True)

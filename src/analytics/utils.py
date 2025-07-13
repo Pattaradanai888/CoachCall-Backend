@@ -1,9 +1,9 @@
 # src/analytics/utils.py
 from datetime import date, timedelta
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any
 
 
-def format_trend_data(daily_counts_dict: Dict[date, int]) -> List[Dict[str, Any]]:
+def format_trend_data(daily_counts_dict: dict[date, int]) -> list[dict[str, Any]]:
     six_days_ago = date.today() - timedelta(days=6)
     dates = [six_days_ago + timedelta(days=i) for i in range(7)]
     trend_data = []
@@ -21,8 +21,8 @@ def format_trend_data(daily_counts_dict: Dict[date, int]) -> List[Dict[str, Any]
 
 
 def calculate_weekly_insights(
-    week_count: int, prev_week_count: int, trend_data: List[Dict[str, Any]]
-) -> Tuple[Optional[float], Optional[str], float, Optional[bool]]:
+    week_count: int, prev_week_count: int, trend_data: list[dict[str, Any]]
+) -> tuple[float | None, str | None, float, bool | None]:
     week_change = None
     is_growing = None
     if prev_week_count is not None and prev_week_count > 0:

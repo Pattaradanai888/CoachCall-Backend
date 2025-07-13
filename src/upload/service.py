@@ -2,53 +2,46 @@
 import io
 import os
 import uuid
-from typing import Optional
 
+from azure.core.exceptions import AzureError
 from azure.storage.blob import ContentSettings
 from azure.storage.blob.aio import BlobServiceClient
-from azure.core.exceptions import AzureError
-from fastapi import HTTPException, status, UploadFile
+from fastapi import HTTPException, UploadFile, status
 from PIL import Image
 
 from .config import upload_settings
-from .schemas import ImageType, ImageConfig, UploadResult
+from .schemas import ImageConfig, ImageType, UploadResult
 
 
 class ImageUploadService:
     def __init__(self):
         self.blob_service_client = BlobServiceClient(
             account_url=f"https://{upload_settings.AZURE_STORAGE_ACCOUNT}.blob.core.windows.net",
-            credential=upload_settings.AZURE_STORAGE_KEY
+            credential=upload_settings.AZURE_STORAGE_KEY,
         )
 
         self.configs = {
             ImageType.PROFILE: ImageConfig(
-                max_width=300,
-                max_height=300,
-                quality=85,
-                max_file_size=2 * 1024 * 1024
+                max_width=300, max_height=300, quality=85, max_file_size=2 * 1024 * 1024
             ),
             ImageType.ATHLETE: ImageConfig(
-                max_width=400,
-                max_height=400,
-                quality=85,
-                max_file_size=3 * 1024 * 1024
+                max_width=400, max_height=400, quality=85, max_file_size=3 * 1024 * 1024
             ),
             ImageType.COURSE: ImageConfig(
                 max_width=1600,  # Recommended 16:9 ratio
                 max_height=900,
                 quality=85,
-                max_file_size=5 * 1024 * 1024  # 5MB
+                max_file_size=5 * 1024 * 1024,  # 5MB
             ),
         }
 
     async def upload_image(
-            self,
-            file: UploadFile,
-            image_type: ImageType,
-            user_id: int,
-            subfolder: Optional[str] = None,
-            entity_id: Optional[int] = None
+        self,
+        file: UploadFile,
+        image_type: ImageType,
+        user_id: int,
+        subfolder: str | None = None,
+        entity_id: int | None = None,
     ) -> UploadResult:
         config = self.configs[image_type]
         container = upload_settings.PROFILE_IMAGES_CONTAINER
@@ -60,15 +53,13 @@ class ImageUploadService:
         if self._is_image_file(file.filename):
             content = self._process_image(content, config)
 
-        blob_name = self._generate_blob_name(image_type, user_id, file.filename, subfolder, entity_id)
+        blob_name = self._generate_blob_name(
+            image_type, user_id, file.filename, subfolder, entity_id
+        )
 
         url = await self._upload_to_azure(content, blob_name, container)
 
-        return UploadResult(
-            url=url,
-            blob_name=blob_name,
-            file_size=len(content)
-        )
+        return UploadResult(url=url, blob_name=blob_name, file_size=len(content))
 
     async def delete_image(self, url: str) -> bool:
         try:
@@ -79,8 +70,7 @@ class ImageUploadService:
                 return False
 
             blob_client = self.blob_service_client.get_blob_client(
-                container=container,
-                blob=blob_name
+                container=container, blob=blob_name
             )
             await blob_client.delete_blob()
             return True
@@ -90,15 +80,15 @@ class ImageUploadService:
     def _validate_file(self, file: UploadFile, config: ImageConfig):
         if not file.filename:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No file provided"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No file provided"
             )
 
         file_ext = os.path.splitext(file.filename)[1].lower()
         if file_ext not in config.allowed_extensions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid file type. Allowed: {', '.join(config.allowed_extensions)}"
+                detail=f"Invalid file type. Allowed: "
+                f"{', '.join(config.allowed_extensions)}",
             )
 
         file.file.seek(0, 2)
@@ -108,7 +98,8 @@ class ImageUploadService:
         if file_size > config.max_file_size:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File too large. Max: {config.max_file_size // (1024 * 1024)}MB"
+                detail=f"File too large. Max: "
+                f"{config.max_file_size // (1024 * 1024)}MB",
             )
 
     def _process_image(self, content: bytes, config: ImageConfig) -> bytes:
@@ -118,26 +109,30 @@ class ImageUploadService:
             if image.mode in ("RGBA", "P"):
                 image = image.convert("RGB")
 
-            image.thumbnail((config.max_width, config.max_height), Image.Resampling.LANCZOS)
+            image.thumbnail(
+                (config.max_width, config.max_height), Image.Resampling.LANCZOS
+            )
 
             img_byte_arr = io.BytesIO()
-            image.save(img_byte_arr, format='JPEG', quality=config.quality, optimize=True)
+            image.save(
+                img_byte_arr, format="JPEG", quality=config.quality, optimize=True
+            )
 
             return img_byte_arr.getvalue()
 
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to process image: {str(e)}"
-            )
+                detail=f"Failed to process image: {str(e)}",
+            ) from e
 
     def _generate_blob_name(
-            self,
-            image_type: ImageType,
-            user_id: int,
-            filename: str,
-            subfolder: Optional[str] = None,
-            entity_id: Optional[int] = None
+        self,
+        image_type: ImageType,
+        user_id: int,
+        filename: str,
+        subfolder: str | None = None,
+        entity_id: int | None = None,
     ) -> str:
         file_id = str(uuid.uuid4())
         file_ext = os.path.splitext(filename)[1].lower()
@@ -160,11 +155,12 @@ class ImageUploadService:
         else:
             return f"{base_path}/{identifier}_{file_id}{file_ext}"
 
-    async def _upload_to_azure(self, content: bytes, blob_name: str, container: str) -> str:
+    async def _upload_to_azure(
+        self, content: bytes, blob_name: str, container: str
+    ) -> str:
         try:
             blob_client = self.blob_service_client.get_blob_client(
-                container=container,
-                blob=blob_name
+                container=container, blob=blob_name
             )
 
             await blob_client.upload_blob(
@@ -172,8 +168,8 @@ class ImageUploadService:
                 overwrite=True,
                 content_settings=ContentSettings(
                     content_type="image/jpeg",
-                    cache_control="public, max-age=31536000, immutable"
-                )
+                    cache_control="public, max-age=31536000, immutable",
+                ),
             )
 
             return f"https://{upload_settings.AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/{container}/{blob_name}"
@@ -181,14 +177,14 @@ class ImageUploadService:
         except AzureError as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Upload failed: {str(e)}"
-            )
+                detail=f"Upload failed: {str(e)}",
+            ) from e
 
     def _is_image_file(self, filename: str) -> bool:
         image_extensions = {".jpg", ".jpeg", ".png", ".webp"}
         return os.path.splitext(filename)[1].lower() in image_extensions
 
-    def _extract_blob_name(self, url: str) -> Optional[str]:
+    def _extract_blob_name(self, url: str) -> str | None:
         try:
             if f"/{upload_settings.PROFILE_IMAGES_CONTAINER}/" in url:
                 return url.split(f"/{upload_settings.PROFILE_IMAGES_CONTAINER}/")[-1]

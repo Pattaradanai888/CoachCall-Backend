@@ -1,11 +1,11 @@
 # src/profile/schemas.py
-from typing import Optional
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class ProfileUpdate(BaseModel):
-    fullname: Optional[str] = Field(None, min_length=1, max_length=100)
-    email: Optional[EmailStr] = None
+    fullname: str | None = Field(None, min_length=1, max_length=100)
+    email: EmailStr | None = None
 
 
 class PasswordUpdate(BaseModel):
@@ -18,6 +18,6 @@ class ProfileResponse(BaseModel):
     id: int
     email: str
     fullname: str
-    profile_image_url: Optional[str] = None
+    profile_image_url: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

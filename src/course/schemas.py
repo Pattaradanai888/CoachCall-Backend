@@ -2,10 +2,10 @@
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import List, Optional, Dict, Literal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, HttpUrl, Field, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, computed_field
 
 from src.analytics.schemas import SkillScore
 from src.athlete.schemas import PositionResponse
@@ -13,7 +13,7 @@ from src.athlete.schemas import PositionResponse
 
 class SkillBase(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class SkillCreate(SkillBase):
@@ -33,27 +33,27 @@ class TaskSkillWeightCreate(BaseModel):
 
 class TaskCreate(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     duration_minutes: int
-    skill_weights: List[TaskSkillWeightCreate]
+    skill_weights: list[TaskSkillWeightCreate]
 
 
 class SessionCreate(BaseModel):
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     scheduled_date: datetime
     is_template: bool = False
-    tasks: List[TaskCreate]
+    tasks: list[TaskCreate]
 
 
 class CourseCreate(BaseModel):
-    name: str = Field(..., alias='title')
-    description: Optional[str] = None
-    cover_image_url: Optional[HttpUrl] = None
+    name: str = Field(..., alias="title")
+    description: str | None = None
+    cover_image_url: HttpUrl | None = None
     start_date: date
     end_date: date
-    sessions: List[SessionCreate]
-    attendee_ids: Optional[List[UUID]] = []
+    sessions: list[SessionCreate]
+    attendee_ids: list[UUID] | None = []
 
 
 class TaskSkillWeightRead(BaseModel):
@@ -66,9 +66,9 @@ class TaskSkillWeightRead(BaseModel):
 class TaskRead(BaseModel):
     id: int
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     duration_minutes: int
-    skill_weights: List[TaskSkillWeightRead]
+    skill_weights: list[TaskSkillWeightRead]
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -83,9 +83,9 @@ class TaskCompletionRead(BaseModel):
     athlete_uuid: UUID
     task_id: int
     final_score: Decimal
-    scores_breakdown: Optional[Dict[str, float]] = None
-    notes: Optional[str] = None
-    time_seconds: Optional[int] = None
+    scores_breakdown: dict[str, float] | None = None
+    notes: str | None = None
+    time_seconds: int | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -93,13 +93,13 @@ class TaskCompletionRead(BaseModel):
 class SessionRead(BaseModel):
     id: int
     name: str
-    description: Optional[str]
+    description: str | None
     scheduled_date: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     is_template: bool
     status: str
-    tasks: List[SessionTaskRead]
-    completions: List[TaskCompletionRead] = []
+    tasks: list[SessionTaskRead]
+    completions: list[TaskCompletionRead] = []
     total_duration_minutes: int
     model_config = ConfigDict(from_attributes=True)
 
@@ -112,9 +112,9 @@ class SessionRead(BaseModel):
 class SessionTemplateRead(BaseModel):
     id: int
     name: str
-    description: Optional[str] = None
+    description: str | None = None
     total_duration_minutes: int
-    tasks: List[SessionTaskRead]
+    tasks: list[SessionTaskRead]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -127,8 +127,8 @@ class SessionTemplateRead(BaseModel):
 class AttendeeResponse(BaseModel):
     uuid: UUID
     name: str
-    profile_image_url: Optional[str]
-    positions: List[PositionResponse] = []
+    profile_image_url: str | None
+    positions: list[PositionResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -136,13 +136,13 @@ class AttendeeResponse(BaseModel):
 class CourseRead(BaseModel):
     id: int
     name: str
-    description: Optional[str]
-    cover_image_url: Optional[str]
+    description: str | None
+    cover_image_url: str | None
     is_archived: bool
     start_date: datetime
     end_date: datetime
-    sessions: List[SessionRead]
-    attendees: List[AttendeeResponse] = []
+    sessions: list[SessionRead]
+    attendees: list[AttendeeResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -150,44 +150,50 @@ class CourseRead(BaseModel):
 class CourseListRead(BaseModel):
     id: int
     name: str
-    start_date: Optional[datetime]
-    end_date: Optional[datetime]
+    start_date: datetime | None
+    end_date: datetime | None
     attendee_count: int
     is_archived: bool
-    cover_image_url: Optional[str]
+    cover_image_url: str | None
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class FinalEvaluationData(BaseModel):
-    scores: Dict[str, float]
-    notes: Optional[str]
+    scores: dict[str, float]
+    notes: str | None
     time: int
 
 
 class SessionSkillComparison(BaseModel):
-    before: List[SkillScore]
-    after: List[SkillScore]
+    before: list[SkillScore]
+    after: list[SkillScore]
+
 
 class CourseContextForReport(BaseModel):
     id: int
     name: str
-    description: Optional[str]
-    cover_image_url: Optional[str]
+    description: str | None
+    cover_image_url: str | None
     is_archived: bool
     start_date: datetime
     end_date: datetime
-    attendees: List[AttendeeResponse] = []
+    attendees: list[AttendeeResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class SessionReportData(BaseModel):
-    course: Optional[CourseContextForReport] = None
+    course: CourseContextForReport | None = None
     session: SessionRead
-    skill_comparison_data: Dict[str, SessionSkillComparison] = Field(..., alias="skillComparisonData")
-    participatingAthletes: List[AttendeeResponse] = Field(..., alias="participatingAthletes")
-    evaluations: Dict[str, FinalEvaluationData]
-    totalSessionTime: int = Field(..., alias="totalSessionTime")
+    skill_comparison_data: dict[str, SessionSkillComparison] = Field(
+        ..., alias="skillComparisonData"
+    )
+    participating_athletes: list[AttendeeResponse] = Field(
+        ..., alias="participatingAthletes"
+    )
+    evaluations: dict[str, FinalEvaluationData]
+    total_session_time: int = Field(..., alias="totalSessionTime")
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -197,14 +203,14 @@ class TaskCompletionCreate(BaseModel):
     task_id: int
     score: float = Field(..., ge=0, le=100)
 
-    scores: Dict[int, float]
-    notes: Optional[str] = None
+    scores: dict[int, float]
+    notes: str | None = None
     time: int
 
 
 class SessionCompletionPayload(BaseModel):
-    completions: List[TaskCompletionCreate]
-    totalSessionTime: int
+    completions: list[TaskCompletionCreate]
+    total_session_time: int
 
 
 class EventItem(BaseModel):
@@ -213,8 +219,8 @@ class EventItem(BaseModel):
     date: datetime
     type: Literal["course", "quick_session"]
     is_complete: bool
-    course_id: Optional[int] = None
-    course_name: Optional[str] = None
+    course_id: int | None = None
+    course_name: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -1,30 +1,29 @@
 # src/analytics/service.py
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict
-from uuid import UUID as PyUUID
+from datetime import UTC, datetime, timedelta
+from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, select, Date
+from sqlalchemy import Date, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.athlete.models import Athlete, AthleteSkill
-from src.course.models import TaskCompletion, Task, TaskSkillWeight, Skill
-from . import constants
-from . import utils
+from src.course.models import Skill, Task, TaskCompletion, TaskSkillWeight
+
+from . import constants, utils
 from .schemas import (
+    AthleteCreationStat,
+    AthleteInsights,
     AthleteSkillProgression,
     SkillScore,
-    AthleteCreationStat,
     TrendDataPoint,
-    AthleteInsights,
 )
 
 
 async def get_athlete_stats(user_id: int, db: AsyncSession) -> "AthleteCreationStat":
-    now_utc = datetime.now(timezone.utc)
+    now_utc = datetime.now(UTC)
     today_utc = now_utc.date()
 
     # Time periods
@@ -33,14 +32,12 @@ async def get_athlete_stats(user_id: int, db: AsyncSession) -> "AthleteCreationS
     six_days_ago = today_utc - timedelta(days=6)
 
     # Convert to datetime for comparison
-    today_start = datetime.combine(today_utc, datetime.min.time(), tzinfo=timezone.utc)
+    today_start = datetime.combine(today_utc, datetime.min.time(), tzinfo=UTC)
     seven_days_ago_start = datetime.combine(
-        seven_days_ago, datetime.min.time(), tzinfo=timezone.utc
+        seven_days_ago, datetime.min.time(), tzinfo=UTC
     )
-    six_days_ago_start = datetime.combine(
-        six_days_ago, datetime.min.time(), tzinfo=timezone.utc
-    )
-    month_start = datetime.combine(month_ago, datetime.min.time(), tzinfo=timezone.utc)
+    six_days_ago_start = datetime.combine(six_days_ago, datetime.min.time(), tzinfo=UTC)
+    month_start = datetime.combine(month_ago, datetime.min.time(), tzinfo=UTC)
 
     # Basic counts
     today_count = await db.scalar(
@@ -126,7 +123,7 @@ async def get_athlete_stats(user_id: int, db: AsyncSession) -> "AthleteCreationS
 
 
 async def get_athlete_skill_progression(
-    user_id: int, athlete_uuid: PyUUID, db: AsyncSession
+    user_id: int, athlete_uuid: UUID, db: AsyncSession
 ) -> AthleteSkillProgression:
     athlete_q = await db.execute(
         select(Athlete)
@@ -154,7 +151,7 @@ async def get_athlete_skill_progression(
     )
     completion_dates = completion_dates_q.scalars().all()
 
-    day_one_scores_dict = {skill_id: None for skill_id in all_user_skills.keys()}
+    day_one_scores_dict = dict.fromkeys(all_user_skills.keys())
     if completion_dates:
         first_date = completion_dates[0]
         day_one_completions_q = await db.execute(
@@ -217,8 +214,8 @@ async def get_athlete_skill_progression(
 
 
 async def calculate_ema_skill_scores(
-    db: AsyncSession, athlete_id: int, exclude_session_id: Optional[int] = None
-) -> Dict[int, float]:
+    db: AsyncSession, athlete_id: int, exclude_session_id: int | None = None
+) -> dict[int, float]:
     query = (
         select(TaskCompletion)
         .where(TaskCompletion.athlete_id == athlete_id)
@@ -283,7 +280,8 @@ async def calculate_ema_skill_scores(
                     # First time seeing this skill - initialize with the first score
                     current_ema_scores[skill_id] = session_avg
                 else:
-                    # Apply EMA formula: new_ema = (new_value * alpha) + (old_ema * (1 - alpha))
+                    # Apply EMA formula:
+                    # new_ema = (new_value * alpha) + (old_ema * (1 - alpha))
                     current_ema_scores[skill_id] = (
                         session_avg * constants.EMA_ALPHA
                     ) + (current_ema_scores[skill_id] * (1 - constants.EMA_ALPHA))

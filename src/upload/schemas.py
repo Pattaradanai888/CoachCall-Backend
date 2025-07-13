@@ -1,5 +1,6 @@
 # src/upload/schemas.py
 from enum import Enum
+
 from pydantic import BaseModel
 
 
@@ -21,6 +22,7 @@ class UploadResult(BaseModel):
     url: str
     blob_name: str
     file_size: int
+
 
 class UploadResponse(BaseModel):
     url: str
