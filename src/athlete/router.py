@@ -97,7 +97,7 @@ async def remove_position(
     return await delete_position(position_id, current_user.id, db)
 
 
-@router.get("/latest", response_model=[AthleteListResponse | None])
+@router.get("/latest", response_model=AthleteListResponse | None)
 async def get_latest_athlete(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_session),
