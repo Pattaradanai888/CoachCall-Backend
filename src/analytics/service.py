@@ -29,8 +29,10 @@ from .schemas import (
     AthleteInsights,
     AthleteSkillProgression,
     CoachStatData,
+    ComparativeStat,
     EfficiencyStats,
     EngagementStats,
+    GrowthInsight,
     MotivationalHighlight,
     PlayerInsight,
     SkillFocusItem,
@@ -332,34 +334,63 @@ async def update_athlete_skill_scores(athlete_id: int, db: AsyncSession):
     await db.execute(stmt)
 
 
-async def _get_activity_and_efficiency_stats(
-    user_id: int, month_ago: datetime, db: AsyncSession
-) -> tuple[ActivityStats, EfficiencyStats]:
-    # Use scheduled_date for sessions planned within the last month
-    sessions_this_month_q = await db.execute(
-        select(Session).where(
-            Session.user_id == user_id,
-            Session.scheduled_date >= month_ago,
-            Session.is_template.is_(False),
-        )
-    )
-    sessions_this_month = sessions_this_month_q.scalars().all()
-    sessions_conducted_month = len(sessions_this_month)
+def _calculate_change_percent(current: int, previous: int) -> float | None:
+    if previous is None:
+        return None
+    if previous == 0:
+        return 100.0 if current > 0 else 0.0
+    return round(((current - previous) / previous) * 100, 1)
 
-    # A better "template reuse" logic: sessions belonging to a course are planned
+
+async def _get_activity_and_efficiency_stats(
+    user_id: int, month_ago: datetime, two_months_ago: datetime, db: AsyncSession
+) -> tuple[ActivityStats, EfficiencyStats]:
+    # Sessions this month
+    sessions_this_month_q = select(Session.id, Session.course_id).where(
+        Session.user_id == user_id,
+        Session.scheduled_date >= month_ago,
+        Session.is_template.is_(False),
+    )
+    sessions_this_month_res = (await db.execute(sessions_this_month_q)).all()
+    sessions_conducted_month = len(sessions_this_month_res)
+
+    # Sessions last month
+    sessions_last_month_q = select(func.count(Session.id)).where(
+        Session.user_id == user_id,
+        Session.scheduled_date >= two_months_ago,
+        Session.scheduled_date < month_ago,
+        Session.is_template.is_(False),
+    )
+    sessions_conducted_last_month = await db.scalar(sessions_last_month_q) or 0
+
+    # Courses this month
+    courses_created_month = (
+        await db.scalar(
+            select(func.count(Course.id)).where(
+                Course.user_id == user_id, Course.start_date >= month_ago
+            )
+        )
+        or 0
+    )
+    # Courses last month
+    courses_created_last_month = (
+        await db.scalar(
+            select(func.count(Course.id)).where(
+                Course.user_id == user_id,
+                Course.start_date >= two_months_ago,
+                Course.start_date < month_ago,
+            )
+        )
+        or 0
+    )
+
     sessions_from_template_month = sum(
-        1 for s in sessions_this_month if s.course_id is not None
+        1 for s in sessions_this_month_res if s.course_id is not None
     )
     template_reuse_rate = (
         round((sessions_from_template_month / sessions_conducted_month) * 100, 1)
         if sessions_conducted_month > 0
         else 0.0
-    )
-
-    courses_created_month = await db.scalar(
-        select(func.count(Course.id)).where(
-            Course.user_id == user_id, Course.start_date >= month_ago
-        )
     )
 
     total_sessions = await db.scalar(
@@ -370,7 +401,6 @@ async def _get_activity_and_efficiency_stats(
     user_creation_date = await db.scalar(
         select(User.created_at).where(User.id == user_id)
     )
-    # Handle case where user_creation_date might be None
     total_weeks = (
         (datetime.now(UTC) - user_creation_date).days / 7 if user_creation_date else 1
     )
@@ -379,8 +409,20 @@ async def _get_activity_and_efficiency_stats(
     )
 
     activity = ActivityStats(
-        sessions_conducted_month=sessions_conducted_month,
-        courses_created_month=courses_created_month or 0,
+        sessions_conducted_month=ComparativeStat(
+            current=sessions_conducted_month,
+            previous=sessions_conducted_last_month,
+            change_percent=_calculate_change_percent(
+                sessions_conducted_month, sessions_conducted_last_month
+            ),
+        ),
+        courses_created_month=ComparativeStat(
+            current=courses_created_month,
+            previous=courses_created_last_month,
+            change_percent=_calculate_change_percent(
+                courses_created_month, courses_created_last_month
+            ),
+        ),
         avg_sessions_per_week=avg_sessions_per_week,
     )
     efficiency = EfficiencyStats(
@@ -392,47 +434,109 @@ async def _get_activity_and_efficiency_stats(
 
 
 async def _get_engagement_stats(
-    user_id: int, month_ago: datetime, db: AsyncSession
+    user_id: int,
+    month_ago: datetime,
+    two_months_ago: datetime,
+    three_months_ago: datetime,
+    db: AsyncSession,
 ) -> tuple[EngagementStats, Sequence[Athlete]]:
-    """Gathers stats on athlete roster and attendance."""
     athletes_q = await db.execute(
         select(Athlete)
-        .where(
-            Athlete.user_id == user_id,
-            # PEP8/Ruff Correction: Use is_(True) for boolean checks
-            Athlete.is_active.is_(True),
-        )
+        .where(Athlete.user_id == user_id, Athlete.is_active.is_(True))
         .options(selectinload(Athlete.skill_levels).selectinload(AthleteSkill.skill))
     )
     all_athletes = athletes_q.scalars().unique().all()
     active_roster_count = len(all_athletes)
 
-    new_athletes_month = await db.scalar(
-        select(func.count(Athlete.id)).where(
-            Athlete.user_id == user_id, Athlete.created_at >= month_ago
+    # Get new athlete counts for the last 3 months to analyze trend
+    new_athletes_m1 = (
+        await db.scalar(
+            select(func.count(Athlete.id)).where(
+                Athlete.user_id == user_id, Athlete.created_at >= month_ago
+            )
         )
+        or 0
     )
+    new_athletes_m2 = (
+        await db.scalar(
+            select(func.count(Athlete.id)).where(
+                Athlete.user_id == user_id,
+                Athlete.created_at >= two_months_ago,
+                Athlete.created_at < month_ago,
+            )
+        )
+        or 0
+    )
+    new_athletes_m3 = (
+        await db.scalar(
+            select(func.count(Athlete.id)).where(
+                Athlete.user_id == user_id,
+                Athlete.created_at >= three_months_ago,
+                Athlete.created_at < two_months_ago,
+            )
+        )
+        or 0
+    )
+
+    # Calculate growth trend and narrative
+    growth_insight: GrowthInsight | None
+    if new_athletes_m2 > 0 or new_athletes_m3 > 0:
+        change_recent = new_athletes_m1 - new_athletes_m2
+        change_prior = new_athletes_m2 - new_athletes_m3
+
+        trend_type: str
+        narrative: str
+
+        if change_recent > change_prior:
+            trend_type = "accelerating"
+            narrative = "Your team's growth rate is picking up steam. Great work!"
+        elif change_recent < change_prior:
+            trend_type = "slowing"
+            narrative = (
+                "Growth has slowed recently. A good time to focus on recruitment."
+            )
+        else:
+            trend_type = "steady"
+            narrative = "You're maintaining a consistent rate of new athlete sign-ups."
+
+        growth_insight = GrowthInsight(trend_type=trend_type, narrative=narrative)
+    else:
+        growth_insight = GrowthInsight(
+            trend_type="stable",
+            narrative="Track athlete sign-ups over time to see trends here.",
+        )
 
     # REAL attendance rate calculation
     attendance_q = await db.execute(
         select(
             func.count(SessionAttendee.athlete_id).label("total"),
-            func.sum(case((SessionAttendee.was_present, 1), else_=0)).label("present"),
+            func.sum(case((SessionAttendee.was_present.is_(True), 1), else_=0)).label(
+                "present"
+            ),
         )
         .join(SessionAttendee.session)
         .where(Session.user_id == user_id, Session.scheduled_date >= month_ago)
     )
     attendance_counts = attendance_q.first()
     team_attendance_rate = None
-    if attendance_counts and attendance_counts.total > 0:
+    if (
+        attendance_counts
+        and attendance_counts.total > 0
+        and attendance_counts.present is not None
+    ):
         team_attendance_rate = round(
             (attendance_counts.present / attendance_counts.total) * 100, 1
         )
 
     engagement = EngagementStats(
         active_roster_count=active_roster_count,
-        new_athletes_month=new_athletes_month or 0,
+        new_athletes_month=ComparativeStat(
+            current=new_athletes_m1,
+            previous=new_athletes_m2,
+            change_percent=_calculate_change_percent(new_athletes_m1, new_athletes_m2),
+        ),
         team_attendance_rate=team_attendance_rate,
+        growth_insight=growth_insight,
     )
     return engagement, all_athletes
 
@@ -440,9 +544,6 @@ async def _get_engagement_stats(
 async def _get_skill_and_player_insights(
     user_id: int, month_ago: datetime, all_athletes: Sequence[Athlete], db: AsyncSession
 ) -> tuple[TeamSkillStats, list[PlayerInsight], list[PlayerInsight]]:
-    """Gathers stats on team skill development and identifies key players."""
-
-    # Real metric: "how many athletes have recorded scores".
     athletes_with_scores = sum(1 for a in all_athletes if a.skill_levels)
     athletes_improved_percent = (
         round((athletes_with_scores / len(all_athletes)) * 100, 1)
@@ -450,7 +551,6 @@ async def _get_skill_and_player_insights(
         else 0.0
     )
 
-    # Skill Focus Distribution - based on tasks in recent sessions
     skill_weights_q = await db.execute(
         select(Skill.name, func.count(TaskSkillWeight.task_id).label("count"))
         .select_from(Skill)
@@ -487,11 +587,10 @@ async def _get_skill_and_player_insights(
         skill_focus_distribution=skill_focus_distribution,
     )
 
-    # Player Insights: Top Performers (based on current average score)
     top_performers = []
     for athlete in all_athletes:
         if athlete.skill_levels:
-            avg_score = sum(s.current_score for s in athlete.skill_levels) / len(
+            avg_score = sum(float(s.current_score) for s in athlete.skill_levels) / len(
                 athlete.skill_levels
             )
             top_performers.append(
@@ -505,7 +604,6 @@ async def _get_skill_and_player_insights(
                 )
             )
 
-    # Player Insights: Needs Attention (based on missed sessions)
     absences_q = await db.execute(
         select(Athlete, func.count(SessionAttendee.session_id).label("missed_count"))
         .join(SessionAttendee, SessionAttendee.athlete_id == Athlete.id)
@@ -539,36 +637,48 @@ async def _get_skill_and_player_insights(
 
 
 def _generate_motivational_highlight(
-    activity: ActivityStats, skill_stats: TeamSkillStats
+    activity: ActivityStats,
+    engagement: EngagementStats,
+    skill_stats: TeamSkillStats,
 ) -> MotivationalHighlight:
-    """Generates a dynamic highlight message based on the collected stats."""
+    sessions_change = activity.sessions_conducted_month.change_percent
+    if sessions_change is not None and sessions_change > 20:
+        return MotivationalHighlight(
+            type="HIGH_IMPACT",
+            message=(
+                f"Great momentum! You've increased sessions by {sessions_change}% "
+                "this month. Keep up the amazing work!"
+            ),
+            icon="mdi:rocket-launch",
+        )
+
+    if (
+        engagement.growth_insight
+        and engagement.growth_insight.trend_type == "accelerating"
+    ):
+        return MotivationalHighlight(
+            type="TEAM_GROWTH",
+            message=engagement.growth_insight.narrative,
+            icon="mdi:account-multiple-plus",
+        )
+
     top_skill_name = (
         skill_stats.top_trending_skill.name
         if skill_stats.top_trending_skill
         else "key skills"
     )
-
-    msg = ""
     if (
-        activity.sessions_conducted_month > 15
-        and skill_stats.athletes_improved_percent > 75
+        activity.sessions_conducted_month.current > 10
+        and skill_stats.athletes_improved_percent > 50
     ):
-        msg = (
-            f"Incredible work! You ran {activity.sessions_conducted_month} "
-            f"sessions and improved over {skill_stats.athletes_improved_percent}% "
-            "of your team!"
-        )
         return MotivationalHighlight(
-            type="HIGH_IMPACT", message=msg, icon="mdi:rocket-launch"
-        )
-
-    if skill_stats.top_trending_skill:
-        msg = (
-            f"Your focus on {top_skill_name} is paying off, with "
-            f"{skill_stats.athletes_improved_percent}% of athletes showing progress."
-        )
-        return MotivationalHighlight(
-            type="SKILL_BOOST", message=msg, icon="mdi:trending-up"
+            type="SKILL_BOOST",
+            message=(
+                f"Your focus on {top_skill_name} is paying off, with "
+                f"{skill_stats.athletes_improved_percent}% of "
+                f"athletes showing progress."
+            ),
+            icon="mdi:trending-up",
         )
 
     return MotivationalHighlight(
@@ -579,24 +689,24 @@ def _generate_motivational_highlight(
 
 
 async def get_coach_dashboard_stats(user_id: int, db: AsyncSession) -> "CoachStatData":
-    """
-    Provides a comprehensive overview of coach activity, efficiency,
-    and impact on athlete development for the main dashboard.
-    """
     now = datetime.now(UTC)
     month_ago = now - timedelta(days=30)
+    two_months_ago = now - timedelta(days=60)
+    three_months_ago = now - timedelta(days=90)
 
     activity, efficiency = await _get_activity_and_efficiency_stats(
-        user_id, month_ago, db
+        user_id, month_ago, two_months_ago, db
     )
-    engagement, all_athletes = await _get_engagement_stats(user_id, month_ago, db)
+    engagement, all_athletes = await _get_engagement_stats(
+        user_id, month_ago, two_months_ago, three_months_ago, db
+    )
     (
         skill_stats,
         top_improvers,
         needs_attention,
     ) = await _get_skill_and_player_insights(user_id, month_ago, all_athletes, db)
 
-    highlight = _generate_motivational_highlight(activity, skill_stats)
+    highlight = _generate_motivational_highlight(activity, engagement, skill_stats)
 
     return CoachStatData(
         highlight=highlight,

@@ -46,9 +46,15 @@ class MotivationalHighlight(BaseModel):
     icon: str
 
 
+class ComparativeStat(BaseModel):
+    current: int
+    previous: int | None = None
+    change_percent: float | None = None
+
+
 class ActivityStats(BaseModel):
-    sessions_conducted_month: int
-    courses_created_month: int
+    sessions_conducted_month: ComparativeStat
+    courses_created_month: ComparativeStat
     avg_sessions_per_week: float
 
 
@@ -58,10 +64,16 @@ class EfficiencyStats(BaseModel):
     total_sessions_month: int
 
 
+class GrowthInsight(BaseModel):
+    trend_type: Literal["accelerating", "steady", "slowing", "stable"]
+    narrative: str
+
+
 class EngagementStats(BaseModel):
     active_roster_count: int
-    new_athletes_month: int
+    new_athletes_month: ComparativeStat
     team_attendance_rate: float | None
+    growth_insight: GrowthInsight | None = None
 
 
 class SkillFocusItem(BaseModel):
