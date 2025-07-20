@@ -7,7 +7,7 @@ from src.auth.models import User
 from src.database import get_async_session
 
 from . import service
-from .schemas import AthleteCreationStat, CoachStatData
+from .schemas import AthleteCreationStat, CoachStatData, LeaderboardResponse
 
 router = APIRouter()
 
@@ -26,3 +26,11 @@ async def get_coach_efficiency_dashboard(
     db: AsyncSession = Depends(get_async_session),
 ):
     return await service.get_coach_dashboard_stats(current_user.id, db)
+
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
+async def get_athlete_leaderboard(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    return await service.get_leaderboard_data(current_user.id, db)

@@ -108,3 +108,28 @@ class CoachStatData(BaseModel):
     skill: TeamSkillStats
     top_improvers: list[PlayerInsight]
     needs_attention: list[PlayerInsight]
+
+
+class SkillProgressionDetail(BaseModel):
+    skill_name: str
+    day_one_score: float
+    current_score: float
+
+
+class LeaderboardAthlete(BaseModel):
+    uuid: UUID
+    name: str
+    position: str | None
+    profile_image_url: str | None
+    rank: int
+    current_score: float
+    improvement_since_day_one: float
+    improvement_slope: float
+
+
+class LeaderboardResponse(BaseModel):
+    athletes: list[LeaderboardAthlete]
+
+
+class AthleteDetailResponse(LeaderboardAthlete):
+    skill_progression: list[SkillProgressionDetail]

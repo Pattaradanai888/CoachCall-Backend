@@ -23,6 +23,8 @@ dependencies = [
     "sqlalchemy>=2.0.41",
     "uvicorn>=0.35.0",
     "azure-communication-email>=1.0.0",
+    "numpy>=2.3.1",
+    "scipy>=1.16.0",
 ]
 
 [dependency-groups]
@@ -31,6 +33,7 @@ dev = [
     "httpx>=0.28.1",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
     "ruff>=0.12.4",
     "sqlalchemy-utils>=0.41.2",
 ]

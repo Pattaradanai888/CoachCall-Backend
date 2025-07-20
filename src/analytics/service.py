@@ -3,7 +3,9 @@ from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+import numpy as np
 from fastapi import HTTPException
+from scipy import stats
 from sqlalchemy import Date, Sequence, case, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +35,8 @@ from .schemas import (
     EfficiencyStats,
     EngagementStats,
     GrowthInsight,
+    LeaderboardAthlete,
+    LeaderboardResponse,
     MotivationalHighlight,
     PlayerInsight,
     SkillFocusItem,
@@ -717,3 +721,113 @@ async def get_coach_dashboard_stats(user_id: int, db: AsyncSession) -> "CoachSta
         top_improvers=top_improvers,
         needs_attention=needs_attention,
     )
+
+
+async def _calculate_day_one_average_score(
+    athlete_id: int, db: AsyncSession
+) -> float | None:
+    first_completion_date_q = await db.execute(
+        select(func.min(func.cast(TaskCompletion.completed_at, Date))).where(
+            TaskCompletion.athlete_id == athlete_id,
+            TaskCompletion.completed_at.isnot(None),
+        )
+    )
+    first_date = first_completion_date_q.scalar_one_or_none()
+
+    if not first_date:
+        return 0.0  # Return 0 if no completions yet
+
+    day_one_completions_q = await db.execute(
+        select(TaskCompletion.final_score).where(
+            TaskCompletion.athlete_id == athlete_id,
+            func.cast(TaskCompletion.completed_at, Date) == first_date,
+        )
+    )
+    day_one_scores = day_one_completions_q.scalars().all()
+
+    return np.mean([float(s) for s in day_one_scores]) if day_one_scores else 0.0
+
+
+async def _calculate_improvement_slope(athlete_id: int, db: AsyncSession) -> float:
+    completions_q = await db.execute(
+        select(TaskCompletion.completed_at, TaskCompletion.final_score)
+        .where(TaskCompletion.athlete_id == athlete_id)
+        .order_by(TaskCompletion.completed_at.asc())
+    )
+    completions = completions_q.all()
+
+    if len(completions) < 2:
+        return 0.0
+
+    session_scores = defaultdict(list)
+    for comp in completions:
+        if comp.completed_at:
+            session_scores[comp.completed_at.date()].append(float(comp.final_score))
+
+    if len(session_scores) < 2:
+        return 0.0
+
+    sorted_dates = sorted(session_scores.keys())
+    avg_scores = [np.mean(session_scores[date]) for date in sorted_dates]
+
+    x_axis = np.arange(len(sorted_dates))
+
+    # The slope represents the average change in score per session
+    slope, intercept, r_value, p_value, std_err = stats.linregress(x_axis, avg_scores)
+
+    return round(slope, 2) if not np.isnan(slope) else 0.0
+
+
+async def get_leaderboard_data(user_id: int, db: AsyncSession) -> "LeaderboardResponse":
+    athletes_q = await db.execute(
+        select(Athlete)
+        .where(Athlete.user_id == user_id, Athlete.is_active.is_(True))
+        .options(selectinload(Athlete.skill_levels), selectinload(Athlete.positions))
+    )
+    all_athletes = athletes_q.scalars().unique().all()
+
+    leaderboard_data = []
+    for athlete in all_athletes:
+        # 1. Get current EMA score
+        current_scores = [float(s.current_score) for s in athlete.skill_levels]
+        current_avg_score = np.mean(current_scores) if current_scores else 0.0
+
+        # 2. Get Day One score
+        day_one_avg_score = await _calculate_day_one_average_score(athlete.id, db)
+
+        # 3. Get Improvement Slope
+        improvement_slope = await _calculate_improvement_slope(athlete.id, db)
+
+        # 4. Get Position
+        position_names = (
+            ", ".join([p.name for p in athlete.positions])
+            if athlete.positions
+            else "N/A"
+        )
+
+        leaderboard_data.append(
+            {
+                "uuid": athlete.uuid,
+                "name": athlete.name,
+                "position": position_names,
+                "profile_image_url": athlete.profile_image_url,
+                "current_score": current_avg_score,
+                "improvement_since_day_one": (current_avg_score - day_one_avg_score)
+                if day_one_avg_score is not None
+                else 0.0,
+                "improvement_slope": improvement_slope,
+            }
+        )
+
+    # Sort by current score to determine rank
+    sorted_leaderboard = sorted(
+        leaderboard_data, key=lambda x: x["current_score"], reverse=True
+    )
+
+    # Add rank to each athlete
+    final_athletes = [
+        LeaderboardAthlete(rank=i + 1, **data)
+        for i, data in enumerate(sorted_leaderboard)
+    ]
+
+    return LeaderboardResponse(athletes=final_athletes)
