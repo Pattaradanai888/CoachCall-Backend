@@ -210,7 +210,7 @@ class TaskCompletionCreate(BaseModel):
 
 class SessionCompletionPayload(BaseModel):
     completions: list[TaskCompletionCreate]
-    total_session_time: int
+    total_session_time: int = Field(..., alias="totalSessionTime")
 
 
 class EventItem(BaseModel):

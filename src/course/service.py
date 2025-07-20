@@ -14,12 +14,11 @@ from src.analytics.service import (
     calculate_ema_skill_scores,
     update_athlete_skill_scores,
 )
-
-# --- Corrected and Verified Imports ---
 from src.athlete.models import Athlete, AthleteSkill
 from src.course.models import (
     Course,
     Session,
+    SessionAttendee,
     SessionTask,
     Skill,
     Task,
@@ -261,6 +260,20 @@ async def create_course(
                 db_task.skill_weights.append(TaskSkillWeight(**sw_data.model_dump()))
 
     db.add(db_course)
+    await db.flush()
+
+    if valid_attendees and db_course.sessions:
+        attendance_records = []
+        for session in db_course.sessions:
+            for athlete in valid_attendees:
+                attendance_records.append(
+                    SessionAttendee(
+                        session_id=session.id, athlete_id=athlete.id, was_present=False
+                    )
+                )
+        if attendance_records:
+            db.add_all(attendance_records)
+
     await db.commit()
     return await get_course_details(user_id, db_course.id, db)
 
@@ -511,9 +524,9 @@ async def save_task_completions(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    session.total_session_time_seconds = payload.totalSessionTime
+    session.total_session_time_seconds = payload.total_session_time
 
-    athlete_uuids = [c.athlete_uuid for c in payload.completions]
+    athlete_uuids = {c.athlete_uuid for c in payload.completions}
     athletes_q = await db.execute(
         select(Athlete).where(
             Athlete.uuid.in_(athlete_uuids), Athlete.user_id == user_id
@@ -522,6 +535,19 @@ async def save_task_completions(
     athletes_map = {str(a.uuid): a.id for a in athletes_q.scalars().all()}
     if len(athletes_map) != len(set(athlete_uuids)):
         raise HTTPException(status_code=400, detail="One or more athletes not found.")
+
+    participating_athlete_ids = set(athletes_map.values())
+
+    if participating_athlete_ids:
+        stmt = (
+            update(SessionAttendee)
+            .where(
+                SessionAttendee.session_id == session_id,
+                SessionAttendee.athlete_id.in_(participating_athlete_ids),
+            )
+            .values(was_present=True)
+        )
+        await db.execute(stmt)
 
     db_completions = []
     completion_time = datetime.datetime.now(datetime.UTC)
@@ -546,11 +572,7 @@ async def save_task_completions(
 
     await db.flush()
 
-    athlete_int_ids = {
-        athletes_map[str(uuid)] for uuid in athlete_uuids if str(uuid) in athletes_map
-    }
-
-    for athlete_id in athlete_int_ids:
+    for athlete_id in participating_athlete_ids:
         await update_athlete_skill_scores(athlete_id, db)
 
     await db.commit()
