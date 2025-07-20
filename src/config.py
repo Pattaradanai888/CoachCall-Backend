@@ -11,3 +11,14 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+class EmailSettings(BaseSettings):
+    COMMUNICATION_SERVICES_CONNECTION_STRING: str
+    SENDER_ADDRESS: str
+    OTP_EXPIRE_MINUTES: int = 10
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+
+email_settings = EmailSettings()

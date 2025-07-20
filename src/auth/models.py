@@ -48,3 +48,10 @@ class UserProfile(Base):
     profile_image_url = Column(String, nullable=True)
 
     user = relationship("User", back_populates="profile")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    email = Column(String, primary_key=True)
+    otp_hash = Column(String, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
