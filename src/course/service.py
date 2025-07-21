@@ -53,6 +53,29 @@ async def get_skills(user_id: int, db: AsyncSession) -> Sequence[Skill]:
     return result.scalars().all()
 
 
+async def update_skill(
+        user_id: int, skill_id: int, skill_data: SkillCreate, db: AsyncSession
+) -> Skill:
+    query = select(Skill).where(
+        and_(Skill.id == skill_id, Skill.user_id == user_id)
+    )
+    result = await db.execute(query)
+    db_skill = result.scalars().one_or_none()
+
+    if not db_skill:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Skill not found or you do not have permission to edit it.",
+        )
+
+    db_skill.name = skill_data.name
+
+    await db.commit()
+    await db.refresh(db_skill)
+
+    return db_skill
+
+
 async def get_sessions(
     user_id: int, is_template: bool, db: AsyncSession
 ) -> Sequence[Session]:
