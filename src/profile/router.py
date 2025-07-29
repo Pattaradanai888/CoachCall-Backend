@@ -1,9 +1,11 @@
 # src/profile/router.py
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
+from src.auth.schemas import UserProfileRead
+from src.auth.service import mark_onboarding_as_complete
 from src.database import get_async_session
 from src.profile.schemas import PasswordUpdate, ProfileResponse, ProfileUpdate
 from src.profile.service import (
@@ -76,3 +78,23 @@ async def delete_image(
 ):
     await delete_profile_image(current_user, db)
     return {"message": "Profile image deleted successfully"}
+
+@router.put(
+    "/onboarding-complete",
+    response_model=UserProfileRead,
+    status_code=status.HTTP_200_OK,
+)
+async def complete_onboarding(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_session),
+):
+    updated_profile = await mark_onboarding_as_complete(user_id=current_user.id, db=db)
+
+    if not updated_profile:
+        raise HTTPException(
+            # This status code will now work because it's the correct integer from fastapi
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update onboarding status.",
+        )
+
+    return updated_profile

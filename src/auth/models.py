@@ -1,5 +1,5 @@
 # src/auth/models.py
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func, Boolean
 from sqlalchemy.orm import relationship
 
 from src.database import Base
@@ -46,6 +46,7 @@ class UserProfile(Base):
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     display_name = Column(String, nullable=False)
     profile_image_url = Column(String, nullable=True)
+    has_completed_onboarding = Column(Boolean, nullable=False, server_default="false")
 
     user = relationship("User", back_populates="profile")
 

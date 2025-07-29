@@ -21,6 +21,9 @@ class Token(BaseModel):
 class UserProfileRead(BaseModel):
     display_name: str
     profile_image_url: str | None = None
+    has_completed_onboarding: bool
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserRead(BaseModel):
