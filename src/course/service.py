@@ -54,11 +54,9 @@ async def get_skills(user_id: int, db: AsyncSession) -> Sequence[Skill]:
 
 
 async def update_skill(
-        user_id: int, skill_id: int, skill_data: SkillCreate, db: AsyncSession
+    user_id: int, skill_id: int, skill_data: SkillCreate, db: AsyncSession
 ) -> Skill:
-    query = select(Skill).where(
-        and_(Skill.id == skill_id, Skill.user_id == user_id)
-    )
+    query = select(Skill).where(and_(Skill.id == skill_id, Skill.user_id == user_id))
     result = await db.execute(query)
     db_skill = result.scalars().one_or_none()
 

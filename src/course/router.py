@@ -45,8 +45,8 @@ from .service import (
     update_course_attendees,
     update_session,
     update_session_status,
-    upload_course_image,
     update_skill,
+    upload_course_image,
 )
 
 router = APIRouter()
@@ -68,6 +68,7 @@ async def create_new_skill(
 ):
     return await create_skill(current_user.id, skill_data, db)
 
+
 @router.put("/skills/{skill_id}", response_model=SkillRead)
 async def edit_existing_skill(
     skill_id: int,
@@ -78,6 +79,7 @@ async def edit_existing_skill(
     return await update_skill(
         user_id=current_user.id, skill_id=skill_id, skill_data=skill_data, db=db
     )
+
 
 @router.get("/sessions", response_model=list[SessionRead])
 async def list_sessions(

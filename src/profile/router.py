@@ -79,6 +79,7 @@ async def delete_image(
     await delete_profile_image(current_user, db)
     return {"message": "Profile image deleted successfully"}
 
+
 @router.put(
     "/onboarding-complete",
     response_model=UserProfileRead,
@@ -92,7 +93,6 @@ async def complete_onboarding(
 
     if not updated_profile:
         raise HTTPException(
-            # This status code will now work because it's the correct integer from fastapi
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update onboarding status.",
         )

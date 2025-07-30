@@ -1,5 +1,5 @@
 # src/auth/models.py
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func, Boolean
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from src.database import Base
