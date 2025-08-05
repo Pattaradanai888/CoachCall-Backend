@@ -57,7 +57,7 @@ fi
 
 # Stop existing container if running
 print_status "Stopping existing containers..."
-sudo docker-compose down --remove-orphans 2>/dev/null || true
+sudo docker compose down --remove-orphans 2>/dev/null || true
 
 # Pull latest image
 print_status "Pulling latest Docker image..."
@@ -72,7 +72,7 @@ sudo docker run --rm \
 
 # Start the application
 print_status "Starting FastAPI application..."
-sudo docker-compose up -d
+sudo docker compose up -d
 
 # Wait for application to start
 print_status "Waiting for application to start..."
@@ -90,7 +90,7 @@ if sudo docker ps | grep -q $CONTAINER_NAME; then
     # Show application logs
     echo ""
     print_status "Recent application logs:"
-    sudo docker-compose logs --tail=20 fastapi-app
+    sudo docker compose logs --tail=20 fastapi-app
 
     echo ""
     print_status "🎉 Deployment completed successfully!"
@@ -101,14 +101,14 @@ else
     print_error "❌ Application failed to start!"
     echo ""
     print_error "Container logs:"
-    sudo docker-compose logs fastapi-app
+    sudo docker compose logs fastapi-app
     exit 1
 fi
 
 # Show useful commands
 echo ""
 print_status "Useful commands:"
-echo "  View logs: sudo docker-compose logs -f fastapi-app"
-echo "  Restart:   sudo docker-compose restart"
-echo "  Stop:      sudo docker-compose down"
-echo "  Update:    sudo docker pull $DOCKER_IMAGE && sudo docker-compose up -d"
+echo "  View logs: sudo docker compose logs -f fastapi-app"
+echo "  Restart:   sudo docker compose restart"
+echo "  Stop:      sudo docker compose down"
+echo "  Update:    sudo docker pull $DOCKER_IMAGE && sudo docker compose up -d"

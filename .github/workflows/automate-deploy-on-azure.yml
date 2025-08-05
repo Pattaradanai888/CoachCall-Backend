@@ -84,11 +84,21 @@ jobs:
         username: ${{ secrets.AZURE_VM_USERNAME }}
         key: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
         script: |
-          # Navigate to app directory
-          cd /opt/fastapi-app
+          # Create app directory if it doesn't exist
+          sudo mkdir -p /opt/fastapi-backend
+          sudo chown $USER:$USER /opt/fastapi-backend
           
-          # Pull latest code
-          git pull origin main
+          # Navigate to app directory
+          cd /opt/fastapi-backend
+          
+          # Clone repository if it doesn't exist, otherwise pull
+          if [ ! -d ".git" ]; then
+            echo "Cloning repository..."
+            git clone https://github.com/Pattaradanai888/CoachCall-Backend.git .
+          else
+            echo "Pulling latest code..."
+            git pull origin main
+          fi
           
           # Create production .env file from GitHub secrets
           echo "Creating production .env file..."
@@ -115,26 +125,26 @@ jobs:
           # Login to GitHub Container Registry
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           
-          # Pull latest Docker image
-          docker pull ghcr.io/${{ github.repository }}:main
+          # Pull latest Docker image (lowercase repository name)
+          docker pull ghcr.io/pattaradanai888/coachcall-backend:main
           
           # Update docker-compose to use the new image
-          sed -i 's|build: \.|image: ghcr.io/${{ github.repository }}:main|' docker-compose.prod.yml
+          sed -i 's|build: \.|image: ghcr.io/pattaradanai888/coachcall-backend:main|' docker-compose.prod.yml
           
           # Stop current services
-          docker-compose -f docker-compose.prod.yml down
+          docker compose -f docker-compose.prod.yml down
           
           # Start services with new image
-          docker-compose -f docker-compose.prod.yml up -d
+          docker compose -f docker-compose.prod.yml up -d
           
           # Wait for service to be ready
           echo "Waiting for service to start..."
           sleep 30
           
           # Run database migrations (only if DATABASE_URL is available)
-          if docker-compose -f docker-compose.prod.yml exec -T app printenv DATABASE_URL > /dev/null 2>&1; then
+          if docker compose -f docker-compose.prod.yml exec -T app printenv DATABASE_URL > /dev/null 2>&1; then
             echo "Running database migrations..."
-            docker-compose -f docker-compose.prod.yml exec -T app alembic upgrade head || echo "Migration failed, but continuing..."
+            docker compose -f docker-compose.prod.yml exec -T app alembic upgrade head || echo "Migration failed, but continuing..."
           else
             echo "DATABASE_URL not found, skipping migrations"
           fi
@@ -145,7 +155,7 @@ jobs:
           
           # Display image size and clean up
           echo "Docker image size:"
-          docker images ghcr.io/${{ github.repository }}:main --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+          docker images ghcr.io/pattaradanai888/coachcall-backend:main --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
           
           # Clean up old images and containers
           docker system prune -f
