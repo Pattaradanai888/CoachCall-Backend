@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  app:
+    image: ghcr.io/pattaradanai888/coachcall-backend:main  # Will be updated by CI/CD
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - PROJECT_NAME=FastAPI Backend
+      - COMMUNICATION_SERVICES_CONNECTION_STRING=${COMMUNICATION_SERVICES_CONNECTION_STRING}
+      - SENDER_ADDRESS=${SENDER_ADDRESS}
+      - OTP_EXPIRE_MINUTES=10
+    env_file:
+      - .env  # Fallback to local .env file
+    restart: unless-stopped
+    volumes:
+      - app_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  app_logs:

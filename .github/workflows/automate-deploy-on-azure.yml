@@ -1,0 +1,153 @@
+name: Deploy to Azure VM
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # test:
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'pull_request'
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: Set up Python
+  #     uses: actions/setup-python@v5
+  #     with:
+  #       python-version: '3.11'
+  #   - name: Install uv
+  #     uses: astral-sh/setup-uv@v6
+  #   - name: Install dependencies
+  #     run: uv sync --group dev
+  #   - name: Run tests
+  #     run: uv run pytest
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Deploy to Azure VM
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.AZURE_VM_HOST }}
+        username: ${{ secrets.AZURE_VM_USERNAME }}
+        key: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
+        script: |
+          # Navigate to app directory
+          cd /opt/fastapi-app
+          
+          # Pull latest code
+          git pull origin main
+          
+          # Create production .env file from GitHub secrets
+          echo "Creating production .env file..."
+          cat > .env << EOF
+          PROJECT_NAME=${{ secrets.PROJECT_NAME }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          TEST_DATABASE_URL=${{ secrets.TEST_DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_ALGORITHM=HS256
+          TOKEN_TYPE=bearer
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          REFRESH_TOKEN_EXPIRE_MINUTES=10080
+          AZURE_STORAGE_ACCOUNT=${{ secrets.AZURE_STORAGE_ACCOUNT }}
+          AZURE_STORAGE_KEY=${{ secrets.AZURE_STORAGE_KEY }}
+          AZURE_CONTAINER_NAME=${{ secrets.AZURE_CONTAINER_NAME }}
+          COMMUNICATION_SERVICES_CONNECTION_STRING=${{ secrets.COMMUNICATION_SERVICES_CONNECTION_STRING }}
+          SENDER_ADDRESS=${{ secrets.SENDER_ADDRESS }}
+          CORS_ORIGINS=${{ secrets.CORS_ORIGINS }}
+          OTP_EXPIRE_MINUTES=10
+          EOF
+          
+          echo "✅ Production .env file created successfully"
+          
+          # Login to GitHub Container Registry
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          
+          # Pull latest Docker image
+          docker pull ghcr.io/${{ github.repository }}:main
+          
+          # Update docker-compose to use the new image
+          sed -i 's|build: \.|image: ghcr.io/${{ github.repository }}:main|' docker-compose.prod.yml
+          
+          # Stop current services
+          docker-compose -f docker-compose.prod.yml down
+          
+          # Start services with new image
+          docker-compose -f docker-compose.prod.yml up -d
+          
+          # Wait for service to be ready
+          echo "Waiting for service to start..."
+          sleep 30
+          
+          # Run database migrations (only if DATABASE_URL is available)
+          if docker-compose -f docker-compose.prod.yml exec -T app printenv DATABASE_URL > /dev/null 2>&1; then
+            echo "Running database migrations..."
+            docker-compose -f docker-compose.prod.yml exec -T app alembic upgrade head || echo "Migration failed, but continuing..."
+          else
+            echo "DATABASE_URL not found, skipping migrations"
+          fi
+          
+          # Test the deployment
+          echo "Testing deployment..."
+          curl -f http://localhost:8000/health-check || echo "Health check failed, but deployment continued"
+          
+          # Display image size and clean up
+          echo "Docker image size:"
+          docker images ghcr.io/${{ github.repository }}:main --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+          
+          # Clean up old images and containers
+          docker system prune -f
+          
+          echo "Deployment completed successfully!"

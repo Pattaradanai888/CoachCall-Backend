@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  fastapi-app:
+    image: pattaradanai888/fastapi-backend:latest
+    container_name: fastapi-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PROJECT_NAME=${PROJECT_NAME}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - DATABASE_URL=${DATABASE_URL}
+      - TEST_DATABASE_URL=${TEST_DATABASE_URL}
+      - DEPLOYMENT_DATABASE_URL=${DEPLOYMENT_DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+      - TOKEN_TYPE=${TOKEN_TYPE}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - REFRESH_TOKEN_EXPIRE_MINUTES=${REFRESH_TOKEN_EXPIRE_MINUTES}
+      - AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}
+      - AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}
+      - AZURE_CONTAINER_NAME=${AZURE_CONTAINER_NAME}
+      - COMMUNICATION_SERVICES_CONNECTION_STRING=${COMMUNICATION_SERVICES_CONNECTION_STRING}
+      - SENDER_ADDRESS=${SENDER_ADDRESS}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  app-network:
+    driver: bridge

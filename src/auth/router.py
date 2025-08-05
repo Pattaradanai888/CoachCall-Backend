@@ -1,5 +1,4 @@
 # src/auth/router.py
-
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +15,7 @@ COOKIE_SETTINGS = {
     "key": "refresh_token",
     "path": "/",
     "httponly": True,
-    "secure": False,  # Set to True in deployment
+    "secure": True,  # Always use secure in production
     "samesite": "lax",
 }
 

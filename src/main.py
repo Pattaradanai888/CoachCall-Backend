@@ -1,22 +1,17 @@
 # src/main.py
-
-from src.auth import models as auth_models  # noqa
-from src.athlete import models as athlete_models  # noqa
-from src.course import models as course_models  # noqa
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from src.config import settings
-from src.api import api_router
 
+from src.api import api_router
+from src.athlete import models as athlete_models  # noqa
+from src.auth import models as auth_models  # noqa
+from src.config import settings
+from src.course import models as course_models  # noqa
 
 app = FastAPI(title=settings.PROJECT_NAME)
 app.include_router(api_router)
 
-origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+origins = settings.CORS_ORIGINS.split(",")
 
 app.add_middleware(
     CORSMiddleware,
