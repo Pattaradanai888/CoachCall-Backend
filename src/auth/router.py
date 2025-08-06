@@ -1,4 +1,6 @@
 # src/auth/router.py
+import os
+
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,12 +13,14 @@ from src.database import get_async_session
 
 router = APIRouter()
 
+IS_PRODUCTION = os.getenv("ENVIRONMENT") == "production"
+
 COOKIE_SETTINGS = {
     "key": "refresh_token",
     "path": "/",
     "httponly": True,
-    "secure": True,  # Always use secure in production
-    "samesite": "lax",
+    "secure": IS_PRODUCTION,
+    "samesite": "none" if IS_PRODUCTION else "lax",
 }
 
 
