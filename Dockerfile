@@ -63,4 +63,4 @@ HEALTHCHECK --interval=60s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health-check || exit 1
 
 # Run the application with Gunicorn for production
-CMD ["gunicorn", "src.main:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]
+CMD ["gunicorn", "src.main:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
