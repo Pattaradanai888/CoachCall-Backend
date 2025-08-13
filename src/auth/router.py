@@ -21,7 +21,7 @@ COOKIE_SETTINGS = {
     "httponly": True,
     "secure": IS_PRODUCTION,
     "samesite": "none" if IS_PRODUCTION else "lax",
-    "domain": ".azurestaticapps.net",
+    "domain": None,
 }
 
 
