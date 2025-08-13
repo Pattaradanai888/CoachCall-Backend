@@ -21,6 +21,7 @@ COOKIE_SETTINGS = {
     "httponly": True,
     "secure": IS_PRODUCTION,
     "samesite": "none" if IS_PRODUCTION else "lax",
+    "domain": ".blue-sky-07a917e00.1.azurestaticapps.net",
 }
 
 
