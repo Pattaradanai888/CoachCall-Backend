@@ -19,9 +19,7 @@ COOKIE_SETTINGS = {
     "key": "refresh_token",
     "path": "/",
     "httponly": True,
-    "secure": IS_PRODUCTION,
-    "samesite": "none" if IS_PRODUCTION else "lax",
-    "domain": None,
+    "secure": True,
 }
 
 
