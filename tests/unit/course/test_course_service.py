@@ -14,7 +14,8 @@ from src.course.schemas import SkillCreate, SessionCreate, CourseCreate, CourseA
 from src.course.service import (
     create_skill, get_skills, create_session, update_session, delete_session, create_course,
     update_course, delete_course, update_course_archive_status, update_course_attendees,
-    save_task_completions, get_session_report_data, upload_course_image, get_all_events
+    save_task_completions, get_session_report_data, upload_course_image, get_all_events, get_course_details,
+    get_session_by_id, confirm_session
 )
 from src.upload.schemas import UploadResponse, ImageType
 
@@ -76,7 +77,7 @@ class TestSkillService:
         assert skills == []
 
 
-# --- Test ID: UTC-23, UTC-24, UTC-25 ---
+# --- Test ID: UTC-23, UTC-24, UTC-25, UTC-61 ---
 @pytest.mark.asyncio
 class TestSessionService:
     @pytest.fixture
@@ -169,8 +170,61 @@ class TestSessionService:
         assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
         assert "Session not found or you do not have permission." in exc_info.value.detail
 
+    async def test_get_session_by_id_success(self, mock_db_session):
+        """UTC-61-TC-01: Success: Retrieve a session by its ID for the correct user."""
+        # Arrange
+        user_id = 1
+        session_id = 101
+        mock_session = Session(id=session_id, user_id=user_id, name="Found Session")
 
-# --- Test ID: UTC-26, UTC-27, UTC-28, UTC-29, UTC-30 ---
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.unique.return_value.one_or_none.return_value = mock_session
+        mock_db_session.execute.return_value = mock_result
+
+        # Act
+        session = await get_session_by_id(user_id=user_id, session_id=session_id, db=mock_db_session)
+
+        # Assert
+        assert session is not None
+        assert session.id == session_id
+        assert session.name == "Found Session"
+        mock_db_session.execute.assert_awaited_once()
+
+    async def test_get_session_by_id_not_found(self, mock_db_session):
+        """UTC-61-TC-02: Success: Return None when the session ID does not exist."""
+        # Arrange
+        user_id = 1
+        non_existent_session_id = 999
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.unique.return_value.one_or_none.return_value = None
+        mock_db_session.execute.return_value = mock_result
+
+        # Act
+        session = await get_session_by_id(user_id=user_id, session_id=non_existent_session_id, db=mock_db_session)
+
+        # Assert
+        assert session is None
+
+    async def test_get_session_by_id_wrong_user(self, mock_db_session):
+        """UTC-61-TC-03: Success: Return None when the session belongs to another user."""
+        # Arrange
+        requesting_user_id = 1
+        session_id_of_other_user = 101
+
+        # The service function's WHERE clause includes the user_id, so the DB will return nothing.
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.unique.return_value.one_or_none.return_value = None
+        mock_db_session.execute.return_value = mock_result
+
+        # Act
+        session = await get_session_by_id(user_id=requesting_user_id, session_id=session_id_of_other_user,
+                                          db=mock_db_session)
+
+        # Assert
+        assert session is None
+
+# --- Test ID: UTC-26, UTC-27, UTC-28, UTC-29, UTC-30, UTC-60 ---
 @pytest.mark.asyncio
 class TestCourseService:
     @pytest.fixture
@@ -284,6 +338,59 @@ class TestCourseService:
         assert len(mock_course.attendees) == 1
         assert mock_course.attendees[0].uuid == new_athlete_uuid
         mock_db_session.commit.assert_awaited_once()
+
+    async def test_get_course_details_success(self, mock_db_session):
+        """UTC-60-TC-01: Success: Retrieve full details for an existing course."""
+        # Arrange
+        user_id = 1
+        course_id = 101
+        mock_course = Course(id=course_id, user_id=user_id, name="Test Course")
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.unique.return_value.one_or_none.return_value = mock_course
+        mock_db_session.execute.return_value = mock_result
+
+        # Act
+        course = await get_course_details(user_id=user_id, course_id=course_id, db=mock_db_session)
+
+        # Assert
+        assert course is not None
+        assert course.id == course_id
+        assert course.name == "Test Course"
+        mock_db_session.execute.assert_awaited_once()
+
+    async def test_get_course_details_not_found(self, mock_db_session):
+        """UTC-60-TC-02: Success: Return None when the course does not exist."""
+        # Arrange
+        user_id = 1
+        non_existent_course_id = 999
+
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.unique.return_value.one_or_none.return_value = None
+        mock_db_session.execute.return_value = mock_result
+
+        # Act
+        course = await get_course_details(user_id=user_id, course_id=non_existent_course_id, db=mock_db_session)
+
+        # Assert
+        assert course is None
+
+    async def test_get_course_details_wrong_user(self, mock_db_session):
+        """UTC-60-TC-03: Success: Return None when the course belongs to another user."""
+        # Arrange
+        user_id_requesting = 1
+        course_id = 101
+
+        # The query in the service function includes `user_id`, so a failed match will return None
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.unique.return_value.one_or_none.return_value = None
+        mock_db_session.execute.return_value = mock_result
+
+        # Act
+        course = await get_course_details(user_id=user_id_requesting, course_id=course_id, db=mock_db_session)
+
+        # Assert
+        assert course is None
 
 
 # --- Test ID: UTC-31 & UTC-32 ---
@@ -420,3 +527,58 @@ class TestEventService:
         assert quick_session_event.type == "quick_session"
         assert quick_session_event.is_complete is False
         assert quick_session_event.course_name is None
+
+
+# --- Test ID: UTC-106 ---
+@pytest.mark.asyncio
+@patch("src.course.service.get_session_by_id", new_callable=AsyncMock)
+class TestConfirmSession:
+    """Tests the confirm_session service function."""
+
+    async def test_confirm_session_success(self, mock_get_session, mock_db_session):
+        """UTC-106-TC-01: Success: Confirm a pending session."""
+        # Arrange
+        user_id = 1
+        session_id = 101
+
+        # Mock the UPDATE statement's result
+        mock_update_result = MagicMock()
+        mock_update_result.scalar_one_or_none.return_value = session_id  # Simulate 1 row updated
+        mock_db_session.execute.return_value = mock_update_result
+
+        # Mock the final get_session_by_id call to return the updated session
+        updated_session_mock = Session(id=session_id, status="To Do")
+        mock_get_session.return_value = updated_session_mock
+
+        # Act
+        result_session = await confirm_session(user_id=user_id, session_id=session_id, db=mock_db_session)
+
+        # Assert
+        mock_db_session.execute.assert_awaited_once()  # The UPDATE was called
+        mock_db_session.commit.assert_awaited_once()
+        mock_get_session.assert_awaited_once_with(user_id=user_id, session_id=session_id, db=mock_db_session)
+
+        assert result_session is not None
+        assert result_session.status == "To Do"
+
+    async def test_confirm_session_not_found(self, mock_get_session, mock_db_session):
+        """UTC-106-TC-02: Failure: Session to confirm is not found or does not meet criteria."""
+        # Arrange
+        user_id = 1
+        session_id = 999
+
+        # Mock the UPDATE statement's result to show 0 rows affected
+        mock_update_result = MagicMock()
+        mock_update_result.scalar_one_or_none.return_value = None
+        mock_db_session.execute.return_value = mock_update_result
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await confirm_session(user_id=user_id, session_id=session_id, db=mock_db_session)
+
+        assert exc_info.value.status_code == 404
+        assert "Pending session not found" in exc_info.value.detail
+
+        # Ensure commit was NOT called, and the final fetch was not attempted
+        mock_db_session.commit.assert_not_awaited()
+        mock_get_session.assert_not_called()

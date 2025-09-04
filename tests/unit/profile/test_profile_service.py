@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from src.auth.models import User, UserProfile
 from src.profile.schemas import ProfileUpdate, PasswordUpdate
 from src.profile.service import (
-    update_profile, change_password, upload_profile_image, delete_profile_image
+    update_profile, change_password, upload_profile_image, delete_profile_image, mark_onboarding_as_complete
 )
 from src.upload.schemas import UploadResponse, ImageType
 
@@ -218,4 +218,62 @@ class TestDeleteProfileImageService:
         with pytest.raises(HTTPException) as exc_info:
             await delete_profile_image(mock_user_with_profile, mock_db_session)
         assert exc_info.value.status_code == 500
+        mock_db_session.rollback.assert_awaited_once()
+
+# --- Test ID: UTC-50 ---
+@pytest.mark.asyncio
+class TestMarkOnboardingAsComplete:
+    async def test_mark_onboarding_as_complete_success(self, mock_user_with_profile, mock_db_session):
+        """UTC-50-TC-01: Success: Mark onboarding as complete for an existing user."""
+        # Arrange: Ensure the initial state is 'not completed'
+        mock_user_with_profile.profile.has_completed_onboarding = False
+
+        # Mock the database query to find the user's profile
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_user_with_profile.profile
+        mock_db_session.execute.return_value = mock_result
+
+        # Act
+        updated_profile = await mark_onboarding_as_complete(
+            user_id=mock_user_with_profile.id, db=mock_db_session
+        )
+
+        # Assert
+        assert updated_profile.has_completed_onboarding is True
+        # The session tracks changes on existing objects, so .add() is not called.
+        mock_db_session.add.assert_not_called()
+        mock_db_session.commit.assert_awaited_once()
+        mock_db_session.refresh.assert_awaited_once_with(updated_profile)
+
+    async def test_mark_onboarding_profile_not_found_failure(self, mock_db_session):
+        """UTC-50-TC-02: Failure: Attempt to mark onboarding for a non-existent user profile."""
+        # Arrange: Mock the database query to return None
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = None
+        mock_db_session.execute.return_value = mock_result
+        non_existent_user_id = 999
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await mark_onboarding_as_complete(user_id=non_existent_user_id, db=mock_db_session)
+
+        assert exc_info.value.status_code == 404
+        assert exc_info.value.detail == "User profile not found"
+
+    async def test_mark_onboarding_db_error_failure(self, mock_user_with_profile, mock_db_session):
+        """UTC-115-TC-03: Failure: An unexpected database error occurs during the commit operation."""
+        # Arrange: Mock the query to find the profile successfully
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = mock_user_with_profile.profile
+        mock_db_session.execute.return_value = mock_result
+        # Arrange: Mock the commit to fail
+        mock_db_session.commit.side_effect = Exception("Database connection failed")
+
+        # Act & Assert
+        with pytest.raises(HTTPException) as exc_info:
+            await mark_onboarding_as_complete(user_id=mock_user_with_profile.id, db=mock_db_session)
+
+        assert exc_info.value.status_code == 500
+        # FIX: Assert the exact detail message from the production code
+        assert exc_info.value.detail == "Could not update onboarding status."
         mock_db_session.rollback.assert_awaited_once()

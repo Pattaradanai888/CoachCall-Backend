@@ -1,9 +1,10 @@
 # src/profile/service.py
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.models import User
+from src.auth.models import User, UserProfile
 from src.auth.utils import hash_password, verify_password
 from src.profile.schemas import PasswordUpdate, ProfileUpdate
 from src.upload.schemas import ImageType
@@ -18,8 +19,6 @@ async def update_profile(
             raise HTTPException(status_code=500, detail="User profile not found.")
 
         if profile_data.email and profile_data.email != current_user.email:
-            from sqlalchemy import select
-
             result = await db.execute(
                 select(User).where(User.email == profile_data.email)
             )
@@ -137,4 +136,31 @@ async def delete_profile_image(current_user: User, db: AsyncSession) -> None:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete profile image",
+        ) from None
+
+async def mark_onboarding_as_complete(user_id: int, db: AsyncSession) -> UserProfile:
+    # Find the specific user profile linked to the user's ID
+    stmt = select(UserProfile).where(UserProfile.user_id == user_id)
+    result = await db.execute(stmt)
+    profile = result.scalars().first()
+
+    # If for some reason the profile doesn't exist, raise an error
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
+        )
+
+    # Update the flag
+    profile.has_completed_onboarding = True
+
+    # Try to save the change to the database
+    try:
+        await db.commit()
+        await db.refresh(profile)
+        return profile
+    except Exception:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not update onboarding status.",
         ) from None

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.auth.models import User
 from src.auth.schemas import UserProfileRead
-from src.auth.service import mark_onboarding_as_complete
+from src.profile.service import mark_onboarding_as_complete
 from src.database import get_async_session
 from src.profile.schemas import PasswordUpdate, ProfileResponse, ProfileUpdate
 from src.profile.service import (

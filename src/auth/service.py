@@ -88,30 +88,4 @@ async def refresh_tokens(old_refresh: str) -> Token:
 async def logout_user() -> None:
     return
 
-
-async def mark_onboarding_as_complete(user_id: int, db: AsyncSession) -> UserProfile:
-    # Find the specific user profile linked to the user's ID
-    stmt = select(UserProfile).where(UserProfile.user_id == user_id)
-    result = await db.execute(stmt)
-    profile = result.scalars().first()
-
-    # If for some reason the profile doesn't exist, raise an error
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found"
-        )
-
-    # Update the flag
-    profile.has_completed_onboarding = True
-
-    # Try to save the change to the database
-    try:
-        await db.commit()
-        await db.refresh(profile)
-        return profile
-    except Exception:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not update onboarding status.",
-        ) from None
+# The 'mark_onboarding_as_complete' function has been removed from this file.
