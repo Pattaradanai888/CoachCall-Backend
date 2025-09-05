@@ -112,6 +112,10 @@ class Athlete(Base):
         "Course", secondary=course_attendees, back_populates="attendees"
     )
 
+    session_attendees = relationship(
+        "SessionAttendee", back_populates="athlete", cascade="all, delete-orphan"
+    )
+
     skill_levels = relationship(
         "AthleteSkill", back_populates="athlete", cascade="all, delete-orphan"
     )

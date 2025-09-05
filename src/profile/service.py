@@ -138,6 +138,7 @@ async def delete_profile_image(current_user: User, db: AsyncSession) -> None:
             detail="Failed to delete profile image",
         ) from None
 
+
 async def mark_onboarding_as_complete(user_id: int, db: AsyncSession) -> UserProfile:
     # Find the specific user profile linked to the user's ID
     stmt = select(UserProfile).where(UserProfile.user_id == user_id)

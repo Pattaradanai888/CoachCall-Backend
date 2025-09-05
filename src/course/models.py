@@ -139,7 +139,7 @@ class SessionAttendee(Base):
     was_present = Column(Boolean, default=False)
 
     session = relationship("Session", back_populates="attendance_records")
-    athlete = relationship("Athlete")
+    athlete = relationship("Athlete", back_populates="session_attendees")
 
 
 class TaskCompletion(Base):

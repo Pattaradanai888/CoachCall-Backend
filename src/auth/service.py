@@ -88,4 +88,5 @@ async def refresh_tokens(old_refresh: str) -> Token:
 async def logout_user() -> None:
     return
 
+
 # The 'mark_onboarding_as_complete' function has been removed from this file.
