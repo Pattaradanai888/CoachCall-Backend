@@ -1,21 +1,33 @@
-version: '3.8'
-
 services:
   app:
     image: ghcr.io/pattaradanai888/coachcall-backend:main  # Will be updated by CI/CD
+    container_name: fastapi-backend
     ports:
       - "8000:8000"
     environment:
+      - PROJECT_NAME=${PROJECT_NAME:-FastAPI Backend}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - DATABASE_URL=${DATABASE_URL}
-      - PROJECT_NAME=FastAPI Backend
+      - TEST_DATABASE_URL=${TEST_DATABASE_URL}
+      - DEPLOYMENT_DATABASE_URL=${DEPLOYMENT_DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALGORITHM=${JWT_ALGORITHM:-HS256}
+      - TOKEN_TYPE=${TOKEN_TYPE:-bearer}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      - REFRESH_TOKEN_EXPIRE_MINUTES=${REFRESH_TOKEN_EXPIRE_MINUTES:-10080}
+      - AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}
+      - AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}
+      - AZURE_CONTAINER_NAME=${AZURE_CONTAINER_NAME}
       - COMMUNICATION_SERVICES_CONNECTION_STRING=${COMMUNICATION_SERVICES_CONNECTION_STRING}
       - SENDER_ADDRESS=${SENDER_ADDRESS}
-      - OTP_EXPIRE_MINUTES=10
+      - CORS_ORIGINS=${CORS_ORIGINS}
     env_file:
       - .env  # Fallback to local .env file
     restart: unless-stopped
     volumes:
       - app_logs:/app/logs
+    networks:
+      - app-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health-check"]
       interval: 30s
@@ -23,53 +35,90 @@ services:
       retries: 3
       start_period: 40s
 
+  # Only include monitoring if config files exist
   prometheus:
     image: prom/prometheus:v2.53.0
-    command: ["--web.enable-remote-write-receiver"]
+    container_name: prometheus
     restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
+      # Only mount config if it exists, otherwise use default
+      - ${PWD}/monitoring/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
+    networks:
+      - app-network
     depends_on:
       - app
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    # Use profiles to make monitoring optional
+    profiles:
+      - monitoring
+      - all
 
   loki:
     image: grafana/loki:2.9.8
-    command: -config.file=/etc/loki/config.yml
+    container_name: loki
     restart: unless-stopped
     ports:
       - "3100:3100"
     volumes:
-      - ./monitoring/loki/loki-config.yml:/etc/loki/config.yml:ro
       - loki_data:/loki
+      - ${PWD}/monitoring/loki/loki-config.yml:/etc/loki/local-config.yml:ro
+    networks:
+      - app-network
+    command: -config.file=/etc/loki/local-config.yml
+    profiles:
+      - monitoring
+      - all
 
   promtail:
     image: grafana/promtail:2.9.8
-    command: -config.file=/etc/promtail/config.yml
+    container_name: promtail
     restart: unless-stopped
     volumes:
-      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - ${PWD}/monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - app-network
     depends_on:
       - loki
+    command: -config.file=/etc/promtail/config.yml
+    profiles:
+      - monitoring
+      - all
 
   grafana:
     image: grafana/grafana:10.4.11
+    container_name: grafana
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ${PWD}/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ${PWD}/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ${PWD}/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - app-network
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
       - loki
+    profiles:
+      - monitoring
+      - all
 
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   app_logs:

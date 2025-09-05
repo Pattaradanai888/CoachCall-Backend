@@ -134,8 +134,14 @@ jobs:
           # Stop current services
           docker compose -f docker-compose.prod.yml down
           
-          # Start services with new image
-          docker compose -f docker-compose.prod.yml up -d
+          # Start services with new image (app only first, monitoring if configs exist)
+          if [ -d "monitoring" ] && [ -f "monitoring/prometheus/prometheus.prod.yml" ]; then
+            echo "Starting with monitoring stack..."
+            docker compose -f docker-compose.prod.yml --profile all up -d
+          else
+            echo "Starting app only (monitoring configs not found)..."
+            docker compose -f docker-compose.prod.yml up -d app
+          fi
           
           # Wait for service to be ready
           echo "Waiting for service to start..."
