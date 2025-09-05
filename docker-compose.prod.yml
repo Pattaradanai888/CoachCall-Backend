@@ -1,7 +1,7 @@
 services:
   app:
     image: ghcr.io/pattaradanai888/coachcall-backend:main  # Will be updated by CI/CD
-    # build: .  # Use local build for testing instead of registry
+    # build: .  # Use local build for testing
     container_name: fastapi-backend
     ports:
       - "8000:8000"
@@ -43,84 +43,8 @@ services:
         reservations:
           memory: 200M  # Guaranteed memory
 
-  # Only include monitoring if config files exist
-  prometheus:
-    image: prom/prometheus:v2.53.0
-    container_name: prometheus
-    restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - prometheus_data:/prometheus
-      # Only mount config if it exists, otherwise use default
-      - ${PWD}/monitoring/prometheus/prometheus.prod.yml:/etc/prometheus/prometheus.yml:ro
-    networks:
-      - app-network
-    depends_on:
-      - app
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=7d'  # Reduced from 15d default
-      - '--storage.tsdb.retention.size=150MB'  # Limit storage size
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
-    # Memory optimization for 1GB VM
-    deploy:
-      resources:
-        limits:
-          memory: 200M  # Reduced from default 400MB
-        reservations:
-          memory: 100M
-    # Use profiles to make monitoring optional
-    profiles:
-      - monitoring
-      - lite    # New lite profile for 1GB VMs
-      - all
-
-  # Memory-optimized Grafana for 1GB VM
-  grafana:
-    image: grafana/grafana:10.4.11
-    container_name: grafana-lite
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ${PWD}/monitoring/grafana/grafana-lite.ini:/etc/grafana/grafana.ini:ro  # Memory-optimized config
-      - ${PWD}/monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ${PWD}/monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ${PWD}/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - app-network
-    environment:
-      # Memory optimization settings
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_ANALYTICS_REPORTING_ENABLED=false
-      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
-      - GF_ALERTING_ENABLED=false  # Disable alerting to save memory
-      - GF_EXPLORE_ENABLED=false   # Disable explore feature
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_USERS_ALLOW_ORG_CREATE=false
-      - GF_SNAPSHOTS_EXTERNAL_ENABLED=false
-      # Performance tuning for low memory
-      - GF_DATABASE_LOG_QUERIES=false
-      - GF_LOG_LEVEL=warn
-      - GF_PANELS_ENABLE_ALPHA=false
-    # Strict memory limits for 1GB VM
-    deploy:
-      resources:
-        limits:
-          memory: 150M  # Reduced from default 200M+
-        reservations:
-          memory: 75M
-    depends_on:
-      - prometheus
-    profiles:
-      - monitoring
-      - lite
-      - all
+  # All monitoring services removed for cost optimization and reduced VM resource usage
+  # FastAPI application now runs without any monitoring overhead
 
 networks:
   app-network:
@@ -128,6 +52,7 @@ networks:
 
 volumes:
   app_logs:
-  prometheus_data:
-  grafana_data:  # Re-added for optimized Grafana
-  # Removed loki_data (no longer needed)
+  # All monitoring volumes removed for cost optimization
+  # prometheus_data: removed
+  # grafana_data: removed  
+  # loki_data: removed

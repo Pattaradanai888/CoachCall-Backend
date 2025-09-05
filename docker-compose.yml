@@ -31,66 +31,20 @@ services:
       retries: 3
       start_period: 30s
 
-  prometheus:
-    image: prom/prometheus:v2.53.0
-    container_name: prometheus
-    command: 
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/etc/prometheus/console_libraries"
-      - "--web.console.templates=/etc/prometheus/consoles"
-      - "--web.enable-remote-write-receiver"
-      - "--web.enable-lifecycle"
-    restart: unless-stopped
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus/prometheus.dev.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    networks:
-      - app-network
-    depends_on:
-      - fastapi-app
-
+  # Monitoring services removed for cost optimization and reduced VM resource usage
+  
   # Loki removed for memory optimization - use docker logs directly
   
-  promtail:
-    image: grafana/promtail:2.9.8
-    container_name: promtail
-    command: -config.file=/etc/promtail/config.yml
-    restart: unless-stopped
-    volumes:
-      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-    networks:
-      - app-network
-    depends_on:
-      - fastapi-app  # Changed from loki to fastapi-app since loki is removed
-
-  grafana:
-    image: grafana/grafana:10.4.11
-    container_name: grafana
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    networks:
-      - app-network
-    depends_on:
-      - prometheus
-      # - loki  # Removed - using direct Docker logs instead
-
+  
+  # All monitoring services (Prometheus, Grafana, Loki, Promtail) removed
+  # for cost optimization and reduced VM resource usage
 
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  prometheus_data:
-  grafana_data:
-  # loki_data: removed - no longer needed
+  # All monitoring volumes removed - no longer needed
+  # prometheus_data: removed
+  # grafana_data: removed  
+  # loki_data: removed

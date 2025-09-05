@@ -35,13 +35,15 @@ dev = [
     "pytest-cov>=6.2.1",
     "ruff>=0.12.4",
     "sqlalchemy-utils>=0.41.2",
-    "prometheus-fastapi-instrumentator==6.1.0",
-    "prometheus-client==0.20.0"
+    # Prometheus monitoring dependencies removed for cost optimization
+    # "prometheus-fastapi-instrumentator==6.1.0",
+    # "prometheus-client==0.20.0"
 ]
 prod = [
     "gunicorn>=23.0.0",
-    "prometheus-client==0.20.0",
-    "prometheus-fastapi-instrumentator==6.1.0",
+    # Prometheus monitoring dependencies removed for cost optimization
+    # "prometheus-client==0.20.0",
+    # "prometheus-fastapi-instrumentator==6.1.0",
 ]
 
 [tool.ruff]
