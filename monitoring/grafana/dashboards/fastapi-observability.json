@@ -2,8 +2,7 @@
   "__inputs": [],
   "__requires": [
     {"type": "grafana", "id": "grafana", "name": "Grafana", "version": "10"},
-    {"type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "2.0.0"},
-    {"type": "datasource", "id": "loki", "name": "Loki", "version": "2.0.0"}
+    {"type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "2.0.0"}
   ],
   "title": "FastAPI Observability",
   "uid": "fastapi-observability",
@@ -189,17 +188,6 @@
       "gridPos": {"h": 6, "w": 16, "x": 8, "y": 62},
       "targets": [
         {"expr": "rate(python_gc_collections_total[5m])", "legendFormat": "gen={{generation}}", "datasource": {"type": "prometheus", "uid": "Prometheus"}}
-      ]
-    },
-
-    {
-      "type": "logs",
-      "title": "Application Logs (Loki)",
-      "gridPos": {"h": 12, "w": 24, "x": 0, "y": 68},
-      "options": {"showLabels": true, "wrapLogMessage": true},
-      "datasource": {"type": "loki", "uid": "Loki"},
-      "targets": [
-        {"expr": "{service=~\"fastapi-app|app\"}", "refId": "A"}
       ]
     }
   ]

@@ -100,6 +100,13 @@ jobs:
             git pull origin main
           fi
           
+          # Ensure monitoring configs are present
+          echo "Setting up monitoring configuration..."
+          if [ ! -d "monitoring" ]; then
+            echo "Monitoring directory not found, creating..."
+            mkdir -p monitoring/{prometheus,grafana/{dashboards,provisioning/{dashboards,datasources}},promtail}
+          fi
+          
           # Create production .env file from GitHub secrets
           echo "Creating production .env file..."
           cat > .env << EOF
@@ -134,13 +141,35 @@ jobs:
           # Stop current services
           docker compose -f docker-compose.prod.yml down
           
-          # Start services with new image (app only first, monitoring if configs exist)
-          if [ -d "monitoring" ] && [ -f "monitoring/prometheus/prometheus.prod.yml" ]; then
-            echo "Starting with monitoring stack..."
-            docker compose -f docker-compose.prod.yml --profile all up -d
+          # Check available memory and decide deployment strategy
+          echo "🔍 Checking system resources for optimal deployment..."
+          TOTAL_MEM=$(free -m | awk '/^Mem:/{print $2}')
+          echo "📊 Available memory: ${TOTAL_MEM}MB"
+          
+          if [ "$TOTAL_MEM" -lt 1500 ]; then
+            echo "⚡ Low memory detected (${TOTAL_MEM}MB) - Using memory-optimized lite profile"
+            echo "📦 Starting optimized stack: FastAPI + Prometheus + Dozzle = ~650MB"
+            docker compose -f docker-compose.prod.yml --profile lite up -d
+            echo ""
+            echo "✅ Lightweight monitoring deployed:"
+            echo "   🚀 FastAPI App: http://$(hostname -I | awk '{print $1}'):8000"
+            echo "   📊 Prometheus: http://$(hostname -I | awk '{print $1}'):9090"  
+            echo "   📝 Log Viewer: http://$(hostname -I | awk '{print $1}'):3000"
+            echo "   💾 Memory usage: ~650MB (perfect for 1GB VMs!)"
           else
-            echo "Starting app only (monitoring configs not found)..."
-            docker compose -f docker-compose.prod.yml up -d app
+            echo "✅ Sufficient memory (${TOTAL_MEM}MB) - checking full monitoring config"
+            if [ -f "monitoring/prometheus/prometheus.prod.yml" ] && [ -f "monitoring/grafana/dashboards/fastapi-observability.json" ]; then
+              echo "🚀 Full monitoring config found - deploying complete stack"
+              docker compose -f docker-compose.prod.yml --profile all up -d
+              echo "📊 Full monitoring deployed with Grafana dashboard"
+            else
+              echo "⚠️  Some monitoring config missing - starting with lite profile"
+              docker compose -f docker-compose.prod.yml --profile lite up -d
+              echo ""
+              echo "ℹ️  To enable full monitoring:"
+              echo "   1. Ensure all monitoring config files are in the repository"
+              echo "   2. Run: docker compose -f docker-compose.prod.yml --profile all up -d"
+            fi
           fi
           
           # Wait for service to be ready

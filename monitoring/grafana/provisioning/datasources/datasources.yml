@@ -9,9 +9,4 @@ datasources:
     isDefault: true
     editable: true
 
-  - name: Loki
-    uid: Loki
-    type: loki
-    access: proxy
-    url: http://loki:3100
-    editable: true
+  # Loki datasource removed - using direct Docker logs instead
