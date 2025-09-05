@@ -16,3 +16,5 @@ azure-storage-blob>=12.19.0
 aiohttp
 pytz
 azure-communication-email>=1.0.0
+prometheus-fastapi-instrumentator>=6.1.0
+prometheus_client>=0.20.0
