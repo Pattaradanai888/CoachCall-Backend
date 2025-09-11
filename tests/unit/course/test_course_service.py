@@ -414,10 +414,15 @@ class TestCompletionAndReportService:
         mock_completions_result = MagicMock()
         mock_completions_result.scalars.return_value.unique.return_value.all.return_value = []
 
+        # Mock for the EMA calculation query in update_athlete_skill_scores
+        mock_ema_result = MagicMock()
+        mock_ema_result.scalars.return_value.unique.return_value.all.return_value = []
+
         mock_db_session.execute.side_effect = [
             mock_session_result,
             mock_athlete_result,
-            mock_completions_result
+            mock_completions_result,
+            mock_ema_result  # Additional mock for the EMA calculation
         ]
 
         await save_task_completions(1, 1, payload, mock_db_session)
@@ -443,10 +448,25 @@ class TestCompletionAndReportService:
         mock_session.completions = [mock_completion]
         mock_session.course = Course(id=1, name="Test Course")
         mock_session.total_session_time_seconds = 1800
+        mock_session.status = "Complete"  # Add the required status
 
         mock_result = MagicMock()
         mock_result.scalars.return_value.unique.return_value.one_or_none.return_value = mock_session
-        mock_db_session.execute.return_value = mock_result
+
+        # Mock for the skills query
+        mock_skills_result = MagicMock()
+        mock_skills_result.scalars.return_value.all.return_value = []
+
+        # Mock for the EMA calculation queries (called twice)
+        mock_ema_result = MagicMock()
+        mock_ema_result.scalars.return_value.unique.return_value.all.return_value = []
+
+        mock_db_session.execute.side_effect = [
+            mock_result,  # Session query
+            mock_skills_result,  # Skills query
+            mock_ema_result,  # First EMA calculation (before)
+            mock_ema_result   # Second EMA calculation (after)
+        ]
 
         report_data = await get_session_report_data(1, 1, mock_db_session)
 

@@ -97,14 +97,24 @@ class TestCourseSchemas:
                     "time": 300
                 }
             },
+            "skillComparisonData": {
+                "athlete1-uuid": {
+                    "before": [
+                        {"skill_id": 1, "skill_name": "Passing", "average_score": 80.0}
+                    ],
+                    "after": [
+                        {"skill_id": 1, "skill_name": "Passing", "average_score": 85.0}
+                    ]
+                }
+            },
             "totalSessionTime": 3600
         }
 
         report_data = SessionReportData.model_validate(report_data_dict)
 
-        assert report_data.totalSessionTime == 3600
-        assert len(report_data.participatingAthletes) == 1
-        assert report_data.participatingAthletes[0].name == "Athlete One"
+        assert report_data.total_session_time == 3600
+        assert len(report_data.participating_athletes) == 1
+        assert report_data.participating_athletes[0].name == "Athlete One"
 
     def test_task_skill_weight_validation(self):
         """UTC-35-TC-04: Failure: TaskSkillWeightCreate validation fails for out-of-range weight."""

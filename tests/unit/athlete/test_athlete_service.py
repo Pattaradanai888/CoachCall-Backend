@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from src.analytics.service import get_athlete_stats
+from src.analytics.schemas import AthleteCreationStat
 from src.athlete.models import Athlete, Group, Position, ExperienceLevel
 from src.athlete.schemas import AthleteCreate, AthleteUpdate
 from src.athlete.service import (
@@ -440,25 +441,25 @@ class TestGetAthleteStatsService:
         # Execute
         stats = await get_athlete_stats(1, mock_db_session)
 
-        # 1. Returns a dictionary matching the AthleteCreationStat schema.
-        assert isinstance(stats, dict)
+        # 1. Returns an AthleteCreationStat Pydantic model.
+        assert isinstance(stats, AthleteCreationStat)
 
         # 2. today, week, month, total match mocked values.
-        assert stats["today"] == 2
-        assert stats["week"] == 10
-        assert stats["month"] == 30
-        assert stats["total"] == 100
+        assert stats.today == 2
+        assert stats.week == 10
+        assert stats.month == 30
+        assert stats.total == 100
 
         # 3. insights.week_change_percent is correctly calculated (e.g., 100.0).
         # (10 - 5) / 5 * 100 = 100.0
-        assert stats["insights"]["week_change_percent"] == 100.0
+        assert stats.insights.week_change_percent == 100.0
 
         # 4. insights.is_growing is True.
-        assert stats["insights"]["is_growing"] is True
+        assert stats.insights.is_growing is True
 
         # 5. trend and trend_detailed have 7 items.
-        assert len(stats["trend"]) == 7
-        assert len(stats["trend_detailed"]) == 7
+        assert len(stats.trend) == 7
+        assert len(stats.trend_detailed) == 7
 
 
 # ----------------------------------------------------------------------------------
@@ -676,14 +677,14 @@ class TestGetAthleteStatsEdgeCases:
 
         stats = await get_athlete_stats(1, mock_db_session)
 
-        assert stats["today"] == 0
-        assert stats["week"] == 0
-        assert stats["month"] == 0
-        assert stats["total"] == 0
-        assert stats["trend"] == [0, 0, 0, 0, 0, 0, 0]
-        assert stats["insights"]["week_change_percent"] is None
-        assert stats["insights"]["is_growing"] is None
-        assert stats["insights"]["peak_day"] is None
+        assert stats.today == 0
+        assert stats.week == 0
+        assert stats.month == 0
+        assert stats.total == 0
+        assert stats.trend == [0, 0, 0, 0, 0, 0, 0]
+        assert stats.insights.week_change_percent is None
+        assert stats.insights.is_growing is None
+        assert stats.insights.peak_day is None
 
     async def test_growth_from_zero(self, mock_db_session):
         """UTC-20-TC-03: Success: Calculate week-over-week growth from zero."""
@@ -694,5 +695,5 @@ class TestGetAthleteStatsEdgeCases:
 
         stats = await get_athlete_stats(1, mock_db_session)
 
-        assert stats["insights"]["is_growing"] is True
-        assert stats["insights"]["week_change_percent"] == 100.0
+        assert stats.insights.is_growing is True
+        assert stats.insights.week_change_percent == 100.0
