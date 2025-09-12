@@ -337,7 +337,12 @@ async def cleanup_pending_sessions(db: AsyncSession):
     threshold = datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=24)
     sessions_to_delete_q = await db.execute(
         select(Session.id).where(
-            and_(Session.status == "Pending", Session.scheduled_date < threshold)
+            and_(
+                Session.status == "Pending",
+                Session.course_id.is_(None),
+                Session.is_template.is_(None),
+                Session.scheduled_date < threshold,
+            )
         )
     )
     session_ids_to_delete = sessions_to_delete_q.scalars().all()

@@ -616,11 +616,14 @@ async def _get_skill_and_player_insights(
             Athlete.user_id == user_id,
             Session.scheduled_date >= month_ago,
             SessionAttendee.was_present.is_(False),
+            Session.is_template.is_(False),
+            Session.status == "Complete",
         )
         .group_by(Athlete.id)
         .order_by(func.count(SessionAttendee.session_id).desc())
         .limit(3)
     )
+
     needs_attention = [
         PlayerInsight(
             uuid=athlete.uuid,
