@@ -203,7 +203,13 @@ async def get_athlete_skill_progression(
                     sw.skill_id in all_user_skills
                     and str(sw.skill_id) in comp.scores_breakdown
                 ):
-                    score = comp.scores_breakdown[str(sw.skill_id)]
+                    skill_data = comp.scores_breakdown[str(sw.skill_id)]
+
+                    if isinstance(skill_data, dict) and "final_score" in skill_data:
+                        score = skill_data["final_score"]
+                    else:
+                        score = skill_data
+
                     weight = float(sw.weight)
                     skill_totals[sw.skill_id]["total_weighted_score"] += score * weight
                     skill_totals[sw.skill_id]["total_weight"] += weight
@@ -290,7 +296,13 @@ async def calculate_ema_skill_scores(
                 continue
             for sw in comp.task.skill_weights:
                 if str(sw.skill_id) in comp.scores_breakdown:
-                    score = comp.scores_breakdown[str(sw.skill_id)]
+                    skill_data = comp.scores_breakdown[str(sw.skill_id)]
+
+                    if isinstance(skill_data, dict) and "final_score" in skill_data:
+                        score = skill_data["final_score"]
+                    else:
+                        score = skill_data
+
                     weight = float(sw.weight)
                     session_skill_avg_data[sw.skill_id]["total_weighted_score"] += (
                         score * weight

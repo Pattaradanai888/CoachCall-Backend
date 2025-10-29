@@ -82,6 +82,9 @@ ignore = [
     "FBT001",  # Allow boolean positional arguments
     "FBT002",  # Allow boolean default arguments
 ]
+"src/rubrics/constants.py" = [
+    "E501",    # Allow longer lines for descriptive rubric text
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["fastapibackend"]

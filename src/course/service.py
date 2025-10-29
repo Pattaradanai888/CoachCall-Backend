@@ -580,13 +580,35 @@ async def save_task_completions(
     for completion_data in payload.completions:
         athlete_id = athletes_map.get(str(completion_data.athlete_uuid))
         if athlete_id:
+            calculated_scores_breakdown = {}
+
+            for skill_id_str, indicators in completion_data.scores.items():
+                if not indicators:
+                    continue
+
+                total_score = sum(indicators.values())
+                num_indicators = len(indicators)
+                max_possible = num_indicators * 3
+
+                if max_possible > 0:
+                    skill_score_percentage = round(
+                        (total_score / max_possible) * 100, 2
+                    )
+                else:
+                    skill_score_percentage = 0.0
+
+                calculated_scores_breakdown[skill_id_str] = {
+                    "final_score": skill_score_percentage,
+                    "indicators": indicators,
+                }
+
             db_completions.append(
                 TaskCompletion(
                     session_id=session_id,
                     athlete_id=athlete_id,
                     task_id=completion_data.task_id,
                     final_score=completion_data.score,
-                    scores_breakdown=completion_data.scores,
+                    scores_breakdown=calculated_scores_breakdown,
                     notes=completion_data.notes,
                     time_seconds=completion_data.time,
                     completed_at=completion_time,

@@ -83,7 +83,7 @@ class TaskCompletionRead(BaseModel):
     athlete_uuid: UUID
     task_id: int
     final_score: Decimal
-    scores_breakdown: dict[str, float] | None = None
+    scores_breakdown: dict[str, dict[str, float | dict[str, int]]] | None = None
     notes: str | None = None
     time_seconds: int | None = None
 
@@ -159,8 +159,13 @@ class CourseListRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SkillScoreDetail(BaseModel):
+    indicators: dict[str, int]
+    final_score: float
+
+
 class FinalEvaluationData(BaseModel):
-    scores: dict[str, float]
+    scores: dict[str, SkillScoreDetail | float]
     notes: str | None
     time: int
 
@@ -202,8 +207,7 @@ class TaskCompletionCreate(BaseModel):
     athlete_uuid: UUID
     task_id: int
     score: float = Field(..., ge=0, le=100)
-
-    scores: dict[int, float]
+    scores: dict[int, dict[str, int]]
     notes: str | None = None
     time: int
 
