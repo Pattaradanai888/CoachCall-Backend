@@ -116,7 +116,11 @@ jobs:
           
           echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           
-          docker pull ghcr.io/pattaradanai888/coachcall-backend:main
+          docker system prune -af
+          
+          docker pull --no-cache ghcr.io/pattaradanai888/coachcall-backend:main
+          
+          docker images ghcr.io/pattaradanai888/coachcall-backend:main --digests
           
           docker compose -f docker-compose.prod.yml down
           
