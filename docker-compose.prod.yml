@@ -1,7 +1,6 @@
 services:
   app:
-    image: ghcr.io/pattaradanai888/coachcall-backend:main  # Will be updated by CI/CD
-    # build: .  # Use local build for testing
+    image: ghcr.io/pattaradanai888/coachcall-backend:main
     container_name: fastapi-backend
     ports:
       - "8000:8000"
@@ -23,7 +22,7 @@ services:
       - SENDER_ADDRESS=${SENDER_ADDRESS}
       - CORS_ORIGINS=${CORS_ORIGINS}
     env_file:
-      - .env  # Fallback to local .env file
+      - .env
     restart: unless-stopped
     volumes:
       - app_logs:/app/logs
@@ -35,16 +34,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    # Memory limits for 1GB VM optimization
     deploy:
       resources:
         limits:
-          memory: 400M  # Hard limit - enough for FastAPI
+          memory: 400M
         reservations:
-          memory: 200M  # Guaranteed memory
-
-  # All monitoring services removed for cost optimization and reduced VM resource usage
-  # FastAPI application now runs without any monitoring overhead
+          memory: 200M
 
 networks:
   app-network:
@@ -52,7 +47,3 @@ networks:
 
 volumes:
   app_logs:
-  # All monitoring volumes removed for cost optimization
-  # prometheus_data: removed
-  # grafana_data: removed  
-  # loki_data: removed
