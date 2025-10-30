@@ -67,8 +67,7 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        no-cache: true
         platforms: linux/amd64
 
   deploy:
@@ -124,6 +123,8 @@ jobs:
           
           docker compose -f docker-compose.prod.yml down
           
+          docker network prune -f
+          
           docker compose -f docker-compose.prod.yml up -d app
           
           echo "Waiting for service to start"
@@ -137,8 +138,6 @@ jobs:
             echo "Waiting for container... attempt $i/12"
             sleep 5
           done
-          
-          docker compose -f docker-compose.prod.yml exec -T app alembic upgrade head || echo "Migrations failed or already up to date"
           
           curl -f http://localhost:8000/health-check && echo "Health check passed" || echo "Health check failed"
           
