@@ -84,9 +84,11 @@ jobs:
         username: ${{ secrets.AZURE_VM_USERNAME }}
         key: ${{ secrets.AZURE_VM_PRIVATE_KEY }}
         script: |
+          sudo mkdir -p /opt/fastapi-backend
+          sudo chown -R $USER:$USER /opt/fastapi-backend
           cd /opt/fastapi-backend || { echo "App directory not found"; exit 1; }
           
-          rm -rf .git
+          rm -rf .git temp_repo .env
           
           git clone https://github.com/Pattaradanai888/CoachCall-Backend.git temp_repo
           cp temp_repo/docker-compose.prod.yml .
