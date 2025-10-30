@@ -35,9 +35,7 @@ class User(Base):
     positions = relationship(
         "Position", back_populates="user", cascade="all, delete-orphan"
     )
-    experience_levels = relationship(
-        "ExperienceLevel", back_populates="user", cascade="all, delete-orphan"
-    )
+    # Experience levels are now global/hardcoded - no relationship needed
     groups = relationship("Group", back_populates="user", cascade="all, delete-orphan")
 
 

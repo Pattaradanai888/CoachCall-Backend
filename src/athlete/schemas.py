@@ -1,9 +1,10 @@
 # src/athlete/schemas.py
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 class GroupResponse(BaseModel):
@@ -41,7 +42,7 @@ class AthleteBase(BaseModel):
     age: int | None = None  # Will be calculated
     height: int | None = None
     weight: int | None = None
-    dominant_hand: str | None = None
+    dominant_hand: str | None = None  # Accept any string, will be validated
     date_of_birth: date
     phone_number: str | None = None
     emergency_contact_name: str | None = None
@@ -53,6 +54,40 @@ class AthleteBase(BaseModel):
     experience_level_id: int | None = None
     group_ids: list[int] | None = []
     position_ids: list[int] | None = []
+
+    @field_validator("dominant_hand", mode="before")
+    @classmethod
+    def normalize_dominant_hand(cls, v: str | None) -> str | None:
+        """Convert frontend display values to database enum values (lowercase full words)"""
+        if v is None:
+            return None
+        
+        # Database enum expects: 'right', 'left', 'ambidextrous' (lowercase full words)
+        mapping = {
+            "Right": "right",
+            "right": "right",
+            "RIGHT": "right",
+            "Left": "left",
+            "left": "left",
+            "LEFT": "left",
+            "Ambidextrous": "ambidextrous",
+            "ambidextrous": "ambidextrous",
+            "AMBIDEXTROUS": "ambidextrous",
+            "R": "right",  # Backwards compatibility
+            "r": "right",
+            "L": "left",
+            "l": "left",
+            "A": "ambidextrous",
+            "a": "ambidextrous"
+        }
+        
+        normalized = mapping.get(v)
+        if normalized is None:
+            raise ValueError(
+                f"Invalid dominant_hand value: '{v}'. "
+                "Must be 'Right', 'Left', or 'Ambidextrous'"
+            )
+        return normalized
 
 
 class AthleteCreate(AthleteBase):
@@ -77,7 +112,7 @@ class AthleteUpdate(BaseModel):
     preferred_name: str | None = None
     height: int | None = None
     weight: int | None = None
-    dominant_hand: str | None = None
+    dominant_hand: str | None = None  # Accept any string, will be validated
     date_of_birth: date | None = None
     phone_number: str | None = None
     emergency_contact_name: str | None = None
@@ -87,6 +122,41 @@ class AthleteUpdate(BaseModel):
     experience_level_id: int | None = None
     group_ids: list[int] | None = None
     position_ids: list[int] | None = None
+
+    @field_validator("dominant_hand", mode="before")
+    @classmethod
+    def normalize_dominant_hand(cls, v: str | None) -> str | None:
+        """Convert frontend display values to database enum values (lowercase full words)"""
+        if v is None:
+            return None
+        
+        # Database enum expects: 'right', 'left', 'ambidextrous' (lowercase full words)
+        # Frontend sends: 'Right', 'Left', 'Ambidextrous' (capitalized)
+        mapping = {
+            "Right": "right",
+            "right": "right",
+            "RIGHT": "right",
+            "Left": "left",
+            "left": "left",
+            "LEFT": "left",
+            "Ambidextrous": "ambidextrous",
+            "ambidextrous": "ambidextrous",
+            "AMBIDEXTROUS": "ambidextrous",
+            "R": "right",  # Backwards compatibility
+            "r": "right",
+            "L": "left",
+            "l": "left",
+            "A": "ambidextrous",
+            "a": "ambidextrous"
+        }
+        
+        normalized = mapping.get(v)
+        if normalized is None:
+            raise ValueError(
+                f"Invalid dominant_hand value: '{v}'. "
+                "Must be 'Right', 'Left', or 'Ambidextrous'"
+            )
+        return normalized
 
 
 class AthleteResponse(AthleteBase):

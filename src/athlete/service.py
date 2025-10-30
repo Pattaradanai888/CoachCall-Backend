@@ -21,9 +21,10 @@ async def create_athlete(user_id: int, athlete: AthleteCreate, db: AsyncSession)
 
     db_athlete = Athlete(**athlete_data, user_id=user_id)
 
+    # Validate experience_level_id if provided (experience levels are global)
     if athlete.experience_level_id is not None:
         exp_level = await db.get(ExperienceLevel, athlete.experience_level_id)
-        if not exp_level or exp_level.user_id != user_id:
+        if not exp_level:
             raise HTTPException(
                 status_code=400,
                 detail=f"Invalid experience_level_id: {athlete.experience_level_id}",
@@ -131,6 +132,20 @@ async def update_athlete(
         exclude_unset=True, exclude={"group_ids", "position_ids"}
     )
 
+    # Validate experience_level_id if provided (experience levels are global)
+    if "experience_level_id" in update_data and update_data["experience_level_id"] is not None:
+        from .models import ExperienceLevel
+        level_result = await db.execute(
+            select(ExperienceLevel).where(
+                ExperienceLevel.id == update_data["experience_level_id"]
+            )
+        )
+        if not level_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Experience level with id {update_data['experience_level_id']} not found"
+            )
+    
     # Update simple attributes
     for key, value in update_data.items():
         setattr(db_athlete, key, value)

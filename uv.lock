@@ -479,6 +479,7 @@ dependencies = [
     { name = "azure-storage-blob" },
     { name = "bcrypt" },
     { name = "fastapi", extra = ["standard"] },
+    { name = "gunicorn" },
     { name = "numpy" },
     { name = "pillow" },
     { name = "psycopg2-binary" },
@@ -503,9 +504,6 @@ dev = [
     { name = "ruff" },
     { name = "sqlalchemy-utils" },
 ]
-prod = [
-    { name = "gunicorn" },
-]
 
 [package.metadata]
 requires-dist = [
@@ -517,6 +515,7 @@ requires-dist = [
     { name = "azure-storage-blob", specifier = ">=12.26.0" },
     { name = "bcrypt", specifier = ">=4.0.0" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.116.1" },
+    { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "numpy", specifier = ">=2.3.1" },
     { name = "pillow", specifier = ">=10.0.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
@@ -541,7 +540,7 @@ dev = [
     { name = "ruff", specifier = ">=0.12.4" },
     { name = "sqlalchemy-utils", specifier = ">=0.41.2" },
 ]
-prod = [{ name = "gunicorn", specifier = ">=23.0.0" }]
+prod = []
 
 [[package]]
 name = "frozenlist"

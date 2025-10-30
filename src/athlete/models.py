@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     Enum as SQLAlchemyEnum,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, ENUM as PostgreSQLEnum
 from sqlalchemy.orm import relationship
 
 from src.database import Base
@@ -43,13 +43,13 @@ course_attendees = Table(
 
 
 class DominantHandEnum(str, enum.Enum):
-    RIGHT = "R"
-    LEFT = "L"
-    AMBIDEXTROUS = "A"
+    RIGHT = "right"
+    LEFT = "left"
+    AMBIDEXTROUS = "ambidextrous"
 
     @property
     def display_name(self):
-        return {"R": "Right", "L": "Left", "A": "Ambidextrous"}[self.value]
+        return {"right": "Right", "left": "Left", "ambidextrous": "Ambidextrous"}[self.value]
 
 
 class Athlete(Base):
@@ -70,7 +70,12 @@ class Athlete(Base):
     date_of_birth = Column(Date, nullable=False)
 
     preferred_name = Column(String(50), nullable=True)
-    dominant_hand = Column(SQLAlchemyEnum(DominantHandEnum), nullable=True)
+    # Use PostgreSQL ENUM directly with string values to avoid Python enum name conversion
+    # The database enum has values: 'right', 'left', 'ambidextrous'
+    dominant_hand = Column(
+        PostgreSQLEnum('right', 'left', 'ambidextrous', name='dominanthandenum', create_type=False),
+        nullable=True
+    )
     age = Column(Integer)
     height = Column(Integer)
     weight = Column(Integer)
@@ -140,8 +145,7 @@ class ExperienceLevel(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String(50), nullable=False)
     description = Column(String(255), nullable=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    user = relationship("User", back_populates="experience_levels")
+    # Experience levels are global/hardcoded, not user-specific
     athletes = relationship("Athlete", back_populates="experience_level")
 
 
