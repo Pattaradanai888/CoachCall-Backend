@@ -32,6 +32,7 @@ class TaskSkillWeightCreate(BaseModel):
 
 
 class TaskCreate(BaseModel):
+    id: int | None = None
     name: str
     description: str | None = None
     duration_minutes: int
@@ -39,6 +40,7 @@ class TaskCreate(BaseModel):
 
 
 class SessionCreate(BaseModel):
+    id: int | None = None
     name: str
     description: str | None = None
     scheduled_date: datetime

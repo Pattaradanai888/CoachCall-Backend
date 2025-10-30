@@ -125,14 +125,14 @@ async def create_session(
             )
 
     task_data_list = session_data.tasks
-    session_dict = session_data.model_dump(exclude={"tasks"})
+    session_dict = session_data.model_dump(exclude={"tasks", "id"})
 
     db_session = Session(**session_dict, user_id=user_id)
 
     for i, task_data in enumerate(task_data_list):
         skill_weights_data = task_data.skill_weights
         db_task = Task(
-            **task_data.model_dump(exclude={"skill_weights"}), user_id=user_id
+            **task_data.model_dump(exclude={"skill_weights", "id"}), user_id=user_id
         )
         db_session.tasks.append(SessionTask(task=db_task, sequence=i + 1))
         for sw_data in skill_weights_data:
@@ -179,7 +179,7 @@ async def update_session(
     for i, task_data in enumerate(session_data.tasks):
         skill_weights_data = task_data.skill_weights
         db_task = Task(
-            **task_data.model_dump(exclude={"skill_weights"}), user_id=user_id
+            **task_data.model_dump(exclude={"skill_weights", "id"}), user_id=user_id
         )
         session_task_link = SessionTask(task=db_task, sequence=i + 1)
 
@@ -267,14 +267,15 @@ async def create_course(
 
     for session_data in session_data_list:
         task_data_list = session_data.tasks
-        session_dict = session_data.model_dump(exclude={"tasks"})
+        session_dict = session_data.model_dump(exclude={"tasks", "id"})
         db_session = Session(
             **session_dict, user_id=user_id, course=db_course, status="To Do"
         )
         for i, task_data in enumerate(task_data_list):
             skill_weights_data = task_data.skill_weights
             db_task = Task(
-                **task_data.model_dump(exclude={"skill_weights"}), user_id=user_id
+                **task_data.model_dump(exclude={"skill_weights", "id"}),
+                user_id=user_id,
             )
             db_session.tasks.append(SessionTask(task=db_task, sequence=i + 1))
             for sw_data in skill_weights_data:
@@ -439,23 +440,143 @@ async def update_course(
         else:
             db_course.attendees = []
 
-    db_course.sessions.clear()
-    await db.flush()
+    existing_session_ids = {s.id for s in db_course.sessions}
+    payload_session_ids = {s.id for s in course_data.sessions if s.id is not None}
+
+    sessions_to_delete = existing_session_ids - payload_session_ids
+    if sessions_to_delete:
+        # Delete all related records first (foreign key constraints)
+        await db.execute(
+            delete(SessionAttendee).where(
+                SessionAttendee.session_id.in_(sessions_to_delete)
+            )
+        )
+        await db.execute(
+            delete(TaskCompletion).where(
+                TaskCompletion.session_id.in_(sessions_to_delete)
+            )
+        )
+        await db.execute(
+            delete(SessionTask).where(SessionTask.session_id.in_(sessions_to_delete))
+        )
+        # Now we can safely delete the session
+        await db.execute(
+            delete(Session).where(
+                Session.id.in_(sessions_to_delete), Session.course_id == course_id
+            )
+        )
 
     for session_data in course_data.sessions:
-        task_data_list = session_data.tasks
-        session_dict = session_data.model_dump(exclude={"tasks"})
-        db_session = Session(**session_dict, user_id=user_id, course_id=db_course.id)
-        for i, task_data in enumerate(task_data_list):
-            skill_weights_data = task_data.skill_weights
-            db_task = Task(
-                **task_data.model_dump(exclude={"skill_weights"}), user_id=user_id
+        if session_data.id and session_data.id in existing_session_ids:
+            result = await db.execute(
+                select(Session)
+                .where(
+                    Session.id == session_data.id,
+                    Session.user_id == user_id,
+                    Session.course_id == course_id,
+                )
+                .options(selectinload(Session.tasks).selectinload(SessionTask.task))
             )
-            session_task_link = SessionTask(task=db_task, sequence=i + 1)
-            db_session.tasks.append(session_task_link)
-            for sw_data in skill_weights_data:
-                db_task.skill_weights.append(TaskSkillWeight(**sw_data.model_dump()))
-        db.add(db_session)
+            db_session = result.scalars().unique().one_or_none()
+
+            if not db_session:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Session {session_data.id} not found or does not "
+                        f"belong to this course"
+                    ),
+                )
+
+            db_session.name = session_data.name
+            db_session.description = session_data.description
+            db_session.scheduled_date = session_data.scheduled_date
+            db_session.is_template = session_data.is_template
+
+            existing_task_ids = {st.task_id for st in db_session.tasks}
+            payload_task_ids = {t.id for t in session_data.tasks if t.id is not None}
+
+            tasks_to_unlink = existing_task_ids - payload_task_ids
+            if tasks_to_unlink:
+                await db.execute(
+                    delete(SessionTask).where(
+                        SessionTask.session_id == session_data.id,
+                        SessionTask.task_id.in_(tasks_to_unlink),
+                    )
+                )
+                await db.execute(
+                    delete(Task).where(
+                        Task.id.in_(tasks_to_unlink), Task.user_id == user_id
+                    )
+                )
+
+            for i, task_data in enumerate(session_data.tasks):
+                if task_data.id and task_data.id in existing_task_ids:
+                    result = await db.execute(
+                        select(Task)
+                        .where(Task.id == task_data.id, Task.user_id == user_id)
+                        .options(selectinload(Task.skill_weights))
+                    )
+                    db_task = result.scalars().one_or_none()
+
+                    if not db_task:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Task {task_data.id} not found or unauthorized",
+                        )
+
+                    db_task.name = task_data.name
+                    db_task.description = task_data.description
+                    db_task.duration_minutes = task_data.duration_minutes
+
+                    await db.execute(
+                        delete(TaskSkillWeight).where(
+                            TaskSkillWeight.task_id == task_data.id
+                        )
+                    )
+
+                    for sw_data in task_data.skill_weights:
+                        db_task.skill_weights.append(
+                            TaskSkillWeight(**sw_data.model_dump())
+                        )
+
+                    await db.execute(
+                        update(SessionTask)
+                        .where(
+                            SessionTask.session_id == session_data.id,
+                            SessionTask.task_id == task_data.id,
+                        )
+                        .values(sequence=i + 1)
+                    )
+                else:
+                    db_task = Task(
+                        **task_data.model_dump(exclude={"skill_weights", "id"}),
+                        user_id=user_id,
+                    )
+                    session_task_link = SessionTask(task=db_task, sequence=i + 1)
+                    db_session.tasks.append(session_task_link)
+                    for sw_data in task_data.skill_weights:
+                        db_task.skill_weights.append(
+                            TaskSkillWeight(**sw_data.model_dump())
+                        )
+        else:
+            task_data_list = session_data.tasks
+            session_dict = session_data.model_dump(exclude={"tasks", "id"})
+            db_session = Session(
+                **session_dict, user_id=user_id, course_id=db_course.id, status="To Do"
+            )
+            for i, task_data in enumerate(task_data_list):
+                skill_weights_data = task_data.skill_weights
+                db_task = Task(
+                    **task_data.model_dump(exclude={"skill_weights", "id"}),
+                    user_id=user_id,
+                )
+                db_session.tasks.append(SessionTask(task=db_task, sequence=i + 1))
+                for sw_data in skill_weights_data:
+                    db_task.skill_weights.append(
+                        TaskSkillWeight(**sw_data.model_dump())
+                    )
+            db.add(db_session)
 
     await db.commit()
     return await get_course_details(user_id, course_id, db)
