@@ -2,9 +2,6 @@ services:
   app:
     image: ghcr.io/pattaradanai888/coachcall-backend:main
     container_name: fastapi-backend
-    # Force a robust start command that doesn't rely on console_script shims
-    # Using the venv's python to run gunicorn as a module avoids PATH/shebang issues
-    command: ["/app/.venv/bin/python", "-m", "gunicorn", "src.main:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "--forwarded-allow-ips", "*"]
     ports:
       - "8000:8000"
     environment:

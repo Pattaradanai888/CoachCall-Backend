@@ -17,8 +17,8 @@ WORKDIR /app
 # Copy uv configuration files
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies to .venv (includes prod group for gunicorn)
-RUN uv sync --frozen --no-cache --no-group dev --group prod
+# Install dependencies INCLUDING prod group for gunicorn
+RUN uv sync --frozen --no-cache --group prod
 
 # Production stage - much smaller
 FROM python:3.11-slim
