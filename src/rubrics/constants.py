@@ -15,15 +15,15 @@ SKILL_RUBRICS = {
                 "title": "Elbow & Hand Placement",
                 "descriptions": {
                     1: "Shooting elbow flares out significantly from the body; ball is held far from the body or on the palm of the hand.",
-                    2: "Elbow is sometimes tucked but drifts outward during the shot; hand placement on the ball is inconsistent; guide hand interferes.",
+                    2: "Elbow is sometimes tucked but drifts outward during the shot; hand placement on the ball is inconsistent; guide hand sometimes interferes with the shot.",
                     3: "Shooting elbow is consistently aligned under the ball, creating a straight line to the basket; ball rests on finger pads; guide hand is on the side of the ball for balance only.",
                 },
             },
             {
                 "title": "Upward Motion & Release",
                 "descriptions": {
-                    1: 'Shot is a "push" from the chest; motion is jerky or two-part (a pause between jumping and shooting); poor timing.',
-                    2: "Motion is generally fluid, but there are occasional hitches; release point is inconsistent (sometimes too early, sometimes too late).",
+                    1: 'Shot is a "push" from the chest; motion is jerky or two-part (a pause between jumping and shooting); poor timing; release point is low and inconsistent.',
+                    2: "Motion is generally fluid, but there are occasional hitches; release point is inconsistent (sometimes too early, sometimes too late); Energy transfer is inconsistent.",
                     3: "A single, fluid motion from the shot pocket to the release point; energy is transferred smoothly from legs to the ball; consistent release point above the head.",
                 },
             },
@@ -43,15 +43,15 @@ SKILL_RUBRICS = {
                 "title": "Stance & Body Position",
                 "descriptions": {
                     1: "Dribbles while standing upright, presenting an easy target for defenders; narrow, unstable stance.",
-                    2: "Maintains a low stance sometimes but rises up when moving or under pressure; balance is inconsistent.",
-                    3: "Maintains a low, athletic stance (butt down, back straight) for balance and protection; uses off-arm to shield the ball.",
+                    2: "Maintains a low stance sometimes but rises up when moving or under pressure; balance is inconsistent; Inconsistent use of the off-arm for protection.",
+                    3: "Maintains a low, athletic stance (butt down, back straight) for balance and protection; uses off-arm to shield the ball; well-balanced and protected.",
                 },
             },
             {
                 "title": "Vision & Awareness",
                 "descriptions": {
-                    1: "Eyes are focused on the basketball; is unaware of teammates, defenders, or court positioning.",
-                    2: "Occasionally looks up to scan the court but immediately looks back down at the ball, especially when dribbling with the non-dominant hand.",
+                    1: "Eyes are focused on the basketball; is unaware of teammates, defenders, or court positioning; watching the ball to maintain control.",
+                    2: "Occasionally looks up to scan the court but immediately looks back down at the ball, especially when dribbling with the non-dominant hand; lacks confidence when not looking at the ball.",
                     3: "Keeps head up consistently, scanning the entire court to see teammates and defenders; dribbles confidently without looking at the ball.",
                 },
             },
@@ -63,7 +63,7 @@ SKILL_RUBRICS = {
                 "title": "Mechanics & Technique",
                 "descriptions": {
                     1: "Throws from the side or with one hand; no step into the pass; poor hand placement (no follow-through with thumbs down).",
-                    2: "Demonstrates correct form (e.g., chest pass, bounce pass) but mechanics break down under pressure or when passing on the move.",
+                    2: "Demonstrates correct form (e.g., chest pass, bounce pass) but mechanics break down under pressure or when passing on the move; inconsistent use of a step to generate power; Inconsistent follow-through.",
                     3: "Consistently executes passes with proper technique; steps into the pass for power; crisp wrist snap and follow-through towards the target.",
                 },
             },
@@ -71,7 +71,7 @@ SKILL_RUBRICS = {
                 "title": "Decision Making & Timing",
                 "descriptions": {
                     1: "Passes into heavy traffic, leading to turnovers; telegraphs passes; passes too late, missing the scoring opportunity.",
-                    2: "Identifies the correct pass but is often hesitant or late; sometimes forces a pass into a covered teammate.",
+                    2: "Identifies the correct pass but is often hesitant or late; sometimes forces a pass into a covered teammate; rarely uses fakes.",
                     3: "Reads the defense effectively; delivers the ball on time and on target to an open teammate; uses fakes to create passing lanes.",
                 },
             },
@@ -79,7 +79,7 @@ SKILL_RUBRICS = {
                 "title": "Velocity & Accuracy",
                 "descriptions": {
                     1: "Passes are consistently off-target (too high, too low, behind the receiver); velocity is too weak or too powerful for the receiver to handle.",
-                    2: "Accuracy and velocity are acceptable in static drills but become unreliable in game situations or on longer passes.",
+                    2: "Accuracy and velocity are acceptable in static drills but become unreliable in game situations or on longer passes; inconsistent velocity control.",
                     3: "Consistently delivers passes that are accurate and easy to catch; adjusts pass velocity appropriately for the situation (e.g., soft touch pass vs. hard skip pass).",
                 },
             },
@@ -91,7 +91,7 @@ SKILL_RUBRICS = {
                 "title": "Positioning & Boxing Out",
                 "descriptions": {
                     1: "Watches the ball in the air; does not make contact with an opponent; gets pushed under the basket easily.",
-                    2: "Attempts to find an opponent to box out but often loses contact or establishes position too late.",
+                    2: "Attempts to find an opponent to box out but often loses contact or establishes position too late; inconsistent boxing out technique.",
                     3: 'Actively seeks out an opponent as the shot goes up; makes contact ("forearm to back"), gets low, and seals the opponent away from the basket.',
                 },
             },
@@ -106,7 +106,7 @@ SKILL_RUBRICS = {
             {
                 "title": 'Ball Security ("Chinning it")',
                 "descriptions": {
-                    1: "Brings the ball down to a low position after securing it, making it vulnerable to being stripped.",
+                    1: "Brings the ball down to a low position after securing it, making it vulnerable to being stripped; not look for the next play.",
                     2: "Secures the rebound but is inconsistent in protecting it; may allow smaller guards to steal the ball.",
                     3: 'Immediately secures the ball and brings it to "chin level" with elbows out for protection; pivots to look for an outlet pass.',
                 },
@@ -127,7 +127,7 @@ SKILL_RUBRICS = {
                 "title": "Footwork & Agility",
                 "descriptions": {
                     1: "Crosses feet when sliding, leading to loss of balance; slow to react to changes in direction.",
-                    2: "Executes a defensive slide but with choppy steps; sometimes crosses feet when the ball-handler makes a quick move.",
+                    2: "Executes a defensive slide but with choppy steps; sometimes crosses feet when the ball-handler makes a quick move; slow to recover when beaten.",
                     3: "Uses a quick, efficient defensive slide without crossing feet; opens hips to turn and run with the player when beaten.",
                 },
             },
@@ -146,8 +146,8 @@ SKILL_RUBRICS = {
             {
                 "title": "Acceleration & First Step",
                 "descriptions": {
-                    1: "Slow to react; first step is high and lacks power; upright posture when starting a sprint.",
-                    2: "Shows some quickness but first step is inconsistent; takes time to reach top speed.",
+                    1: "Slow to react; first step is high and lacks power; upright posture when starting a sprint; covers little ground on the first step.",
+                    2: "Shows some quickness but first step is inconsistent; takes time to reach top speed; average ground coverage.",
                     3: "Explosive and powerful first step from a low, athletic stance; generates immediate forward momentum; covers ground quickly.",
                 },
             },
