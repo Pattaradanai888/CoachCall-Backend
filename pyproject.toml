@@ -24,6 +24,7 @@ dependencies = [
     "azure-communication-email>=1.0.0",
     "numpy>=2.3.1",
     "scipy>=1.16.0",
+    "gunicorn>=23.0.0",
 ]
 
 [dependency-groups]
@@ -40,7 +41,6 @@ dev = [
     # "prometheus-client==0.20.0"
 ]
 prod = [
-    "gunicorn>=23.0.0",
     # Prometheus monitoring dependencies removed for cost optimization
     # "prometheus-client==0.20.0",
     # "prometheus-fastapi-instrumentator==6.1.0",
