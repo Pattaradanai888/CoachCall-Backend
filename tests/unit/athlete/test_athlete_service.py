@@ -8,8 +8,8 @@ import pytest
 from fastapi import HTTPException
 from sqlalchemy import select
 
-from src.analytics.service import get_athlete_stats
 from src.analytics.schemas import AthleteCreationStat
+from src.analytics.service import get_athlete_stats
 from src.athlete.models import Athlete, Group, Position, ExperienceLevel
 from src.athlete.schemas import AthleteCreate, AthleteUpdate
 from src.athlete.service import (
@@ -429,10 +429,11 @@ class TestGetAthleteStatsService:
             5,  # prev_week
         ]
 
-        # Prerequisite: Mock db.execute for daily trend
         mock_daily_row = MagicMock()
-        mock_daily_row.date = datetime.now().date() - date.resolution * 2  # an example date
+        thursday_date = date.today() - timedelta(days=3)
+        mock_daily_row.date = thursday_date
         mock_daily_row.count = 4
+
 
         mock_daily_result = MagicMock()
         mock_daily_result.all.return_value = [mock_daily_row]
@@ -441,17 +442,16 @@ class TestGetAthleteStatsService:
         # Execute
         stats = await get_athlete_stats(1, mock_db_session)
 
-        # 1. Returns an AthleteCreationStat Pydantic model.
+        # 1. Returns an AthleteCreationStat model instance.
         assert isinstance(stats, AthleteCreationStat)
 
-        # 2. today, week, month, total match mocked values.
+        # 2. today, week, month, total match mocked values using dot notation.
         assert stats.today == 2
         assert stats.week == 10
         assert stats.month == 30
         assert stats.total == 100
 
-        # 3. insights.week_change_percent is correctly calculated (e.g., 100.0).
-        # (10 - 5) / 5 * 100 = 100.0
+        # 3. insights.week_change_percent is correctly calculated.
         assert stats.insights.week_change_percent == 100.0
 
         # 4. insights.is_growing is True.
@@ -460,12 +460,6 @@ class TestGetAthleteStatsService:
         # 5. trend and trend_detailed have 7 items.
         assert len(stats.trend) == 7
         assert len(stats.trend_detailed) == 7
-
-
-# ----------------------------------------------------------------------------------
-# --- START OF NEWLY ADDED TESTS ---
-# ----------------------------------------------------------------------------------
-
 
 # --- Test ID: UTC-14 ---
 @pytest.mark.asyncio
@@ -690,7 +684,10 @@ class TestGetAthleteStatsEdgeCases:
         """UTC-20-TC-03: Success: Calculate week-over-week growth from zero."""
         mock_db_session.scalar.side_effect = [1, 5, 5, 5, 0]  # today, week, month, total, prev_week
         mock_daily_result = MagicMock()
-        mock_daily_result.all.return_value = [MagicMock(count=5, day_name="Mon")]  # dummy data
+        mock_daily_row = MagicMock()
+        mock_daily_row.date = date.today()
+        mock_daily_row.count = 5
+        mock_daily_result.all.return_value = [mock_daily_row]
         mock_db_session.execute.return_value = mock_daily_result
 
         stats = await get_athlete_stats(1, mock_db_session)

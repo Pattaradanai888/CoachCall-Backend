@@ -75,13 +75,15 @@ class TestCourseSchemas:
             "session": {
                 "id": 1,
                 "name": "Report Session",
-                "description": None,  # FIX: Add the optional 'description' field, even if it's None.
+                "description": None,
                 "scheduled_date": "2024-08-01T10:00:00Z",
+                "completed_at": None,
                 "is_template": False,
                 "status": "Complete",
                 "tasks": [],
                 "total_duration_minutes": 0,
             },
+            "skillComparisonData": {},
             "participatingAthletes": [
                 {
                     "uuid": uuid.uuid4(),
