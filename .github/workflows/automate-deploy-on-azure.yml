@@ -118,7 +118,7 @@ jobs:
           
           docker system prune -af
           
-          docker pull --no-cache ghcr.io/pattaradanai888/coachcall-backend:main
+          docker pull ghcr.io/pattaradanai888/coachcall-backend:main
           
           docker images ghcr.io/pattaradanai888/coachcall-backend:main --digests
           
