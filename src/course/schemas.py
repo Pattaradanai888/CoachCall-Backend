@@ -190,6 +190,15 @@ class CourseContextForReport(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class SessionInsights(BaseModel):
+    summary: str
+    athlete_notes: dict[str, str]
+    team_pattern: str | None
+    action_items: list[str]
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
 class SessionReportData(BaseModel):
     course: CourseContextForReport | None = None
     session: SessionRead
@@ -201,6 +210,7 @@ class SessionReportData(BaseModel):
     )
     evaluations: dict[str, FinalEvaluationData]
     total_session_time: int = Field(..., alias="totalSessionTime")
+    insights: SessionInsights
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 

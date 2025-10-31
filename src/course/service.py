@@ -15,6 +15,7 @@ from src.analytics.service import (
     update_athlete_skill_scores,
 )
 from src.athlete.models import Athlete, AthleteSkill
+from src.course.insights import generate_session_insights
 from src.course.models import (
     Course,
     Session,
@@ -827,7 +828,8 @@ async def get_session_report_data(
             before=before_scores_list, after=after_scores_list
         )
 
-    return {
+    # Prepare data for insights generation
+    report_data = {
         "course": session.course,
         "session": session,
         "participatingAthletes": list(participating_athlete_objects.values()),
@@ -835,6 +837,14 @@ async def get_session_report_data(
         "totalSessionTime": session.total_session_time_seconds or 0,
         "skillComparisonData": skill_comparison_data,
     }
+
+    # Generate coaching insights
+    insights = generate_session_insights(report_data)
+
+    # Add insights to response
+    report_data["insights"] = insights
+
+    return report_data
 
 
 async def upload_course_image(
