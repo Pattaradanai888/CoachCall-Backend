@@ -15,6 +15,8 @@ from src.auth.utils import (
     hash_password,
     verify_password,
 )
+from src.course.models import Skill
+from src.rubrics.constants import SKILL_RUBRICS
 
 
 async def register_user(user: UserCreate, db: AsyncSession):
@@ -28,6 +30,17 @@ async def register_user(user: UserCreate, db: AsyncSession):
     try:
         await db.commit()
         await db.refresh(db_user)
+
+        # Auto-create standard skills for new user
+        for skill_name in SKILL_RUBRICS.keys():
+            skill = Skill(
+                name=skill_name,
+                description=f"{skill_name} skill evaluation",
+                user_id=db_user.id,
+            )
+            db.add(skill)
+
+        await db.commit()
 
         stmt = (
             select(User)
