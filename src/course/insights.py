@@ -1,3 +1,5 @@
+# src/course/insights.py
+
 from typing import Any
 
 
@@ -159,12 +161,12 @@ def _detect_team_pattern(
 
     for _eval_key, eval_data in evaluations.items():
         scores = eval_data.get("scores", {})
-    for _skill_id, skill_data in scores.items():
-        indicators = skill_data.get("indicators", {})
-        for indicator_name, rating in indicators.items():
-            if rating == 1:  # Needs Improvement
-                key = indicator_name  # Simplified - just use indicator name
-                indicator_counts[key] = indicator_counts.get(key, 0) + 1
+        for _skill_id, skill_data in scores.items():
+            indicators = skill_data.get("indicators", {})
+            for indicator_name, rating in indicators.items():
+                if rating == 1:  # Needs Improvement
+                    key = indicator_name  # Simplified - just use indicator name
+                    indicator_counts[key] = indicator_counts.get(key, 0) + 1
 
     # Find most common weakness with 3+ athletes
     common_weaknesses = [
